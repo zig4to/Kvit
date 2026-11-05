@@ -48,3 +48,34 @@ assert.equal(addMonths("2026-12", 1), "2027-01");
 assert.equal(addMonths("2026-01", -1), "2025-12");
 
 console.log("check-balance: vse OK");
+
+// ===== Delitev stroškov avta =====
+const { splitNet, addNets, settlements, dative } = await import("../src/lib/kvit/cars.ts");
+const owners = ["Žiga", "Nejc"];
+// Passat: Žiga plačal vinjeto 117,50 (neporavnano) → Nejc dolguje 58,75
+const passat = splitNet([{ price: 117.5, paid_by: "Žiga", settled: false }], owners);
+assert.equal(passat.get("Žiga"), 58.75);
+assert.equal(passat.get("Nejc"), -58.75);
+// Berlingo: Nejc plačal 58 + 117 → Žiga dolguje 87,50; poravnani se ne štejejo
+const berlingo = splitNet(
+  [
+    { price: 58, paid_by: "Nejc", settled: false },
+    { price: 117, paid_by: "Nejc", settled: false },
+    { price: 999, paid_by: "Nejc", settled: true },
+  ],
+  owners
+);
+assert.equal(berlingo.get("Žiga"), -87.5);
+const total = addNets([passat, berlingo]);
+assert.deepEqual(settlements(total), [{ from: "Žiga", to: "Nejc", amount: 28.75 }]);
+// En lastnik (Megane, mama) — nič se ne deli
+assert.deepEqual(settlements(splitNet([{ price: 50, paid_by: "Mama", settled: false }], ["Mama"])), []);
+// Plačal nekdo zunaj lastnikov (mama za Passat) → oba dolgujeta njej
+assert.deepEqual(settlements(splitNet([{ price: 100, paid_by: "Mama", settled: false }], owners)), [
+  { from: "Žiga", to: "Mama", amount: 50 },
+  { from: "Nejc", to: "Mama", amount: 50 },
+]);
+assert.equal(dative("Žiga"), "Žigi");
+assert.equal(dative("Nejc"), "Nejcu");
+assert.equal(dative("Mama"), "Mami");
+console.log("check-cars: vse OK");
