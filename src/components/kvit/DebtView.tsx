@@ -113,7 +113,7 @@ export default function DebtView({
       {debts.length === 0 && (
         <p className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
           {editable
-            ? "Še ni vpisanega dolga. Vpiši znesek, ki ga dolguješ (npr. za avto)."
+            ? "Še ni vpisanega dolga. Vpiši znesek, ki ga dolguješ mami."
             : "Ni vpisanega dolga."}
         </p>
       )}
@@ -312,7 +312,7 @@ function FormButtons({
 }
 
 function DebtForm({ debt, onClose }: { debt: DebtWithPayments | null; onClose: () => void }) {
-  const [label, setLabel] = useState(debt?.label ?? "Avto");
+  const [label, setLabel] = useState(debt?.label ?? "Skupni dolg");
   const [amount, setAmount] = useState(debt ? amountInput(debt.amount) : "");
   const [startedOn, setStartedOn] = useState(debt?.started_on ?? "");
   const { error, setError, pending, run } = useSubmit(onClose);
