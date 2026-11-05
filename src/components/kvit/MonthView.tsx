@@ -57,6 +57,7 @@ export default function MonthView({
   const [dialog, setDialog] = useState<{ entry: KvitEntry | null } | null>(null);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [confirmSettle, setConfirmSettle] = useState(false);
+  const [confirmAddPrev, setConfirmAddPrev] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -135,7 +136,7 @@ export default function MonthView({
             title="Dodaj prejšnji mesec (za vnos zgodovine)"
             aria-label="Dodaj prejšnji mesec"
             disabled={pending}
-            onClick={() => run(() => addMonthAction(addMonths(row.key, -1)))}
+            onClick={() => setConfirmAddPrev(true)}
             className="rounded-md p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             <IconChevronLeft className="h-5 w-5" />
@@ -152,6 +153,29 @@ export default function MonthView({
           <span className="w-9" />
         )}
       </div>
+
+      {confirmAddPrev && (
+        <div className="space-y-2 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-800">
+          <p>
+            To je tvoj prvi mesec. Dodam {monthLabel(addMonths(row.key, -1))} za vnos starejših
+            stroškov? Njegovo stanje se bo preneslo v {monthLabel(row.key, false).toLowerCase()}.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmAddPrev(false)}>
+              Prekliči
+            </Button>
+            <Button
+              disabled={pending}
+              onClick={() => {
+                setConfirmAddPrev(false);
+                run(() => addMonthAction(addMonths(row.key, -1)));
+              }}
+            >
+              Dodaj mesec
+            </Button>
+          </div>
+        </div>
+      )}
 
       <section className="rounded-xl border border-gray-200 bg-white p-5 text-center dark:border-gray-800 dark:bg-gray-900">
         <p className="text-sm text-gray-500 dark:text-gray-400">{status.label}</p>
