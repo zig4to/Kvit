@@ -4,69 +4,98 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Kaj je Kvit
 
-Mesečni obračun stroškov skupnega življenja (nadomešča stari Excel). Vsak brat
-mami dolguje fiksni znesek na mesec (privzeto 350 €). Nakupi za hišo (Lidl,
-Hofer, deli za avto …) in plačila mami se od tega odštejejo, posojila od mame
-se prištejejo. Stanje ob koncu meseca (dolg ali dobropis) se **samo prenese**
-v naslednji mesec. Vsak član vidi svoj in bratov obračun, ureja pa samo svojega.
+Družinska aplikacija za obračun stroškov skupnega življenja z mamo (nadomešča
+stara Excela „ŽIGA / NEJC“ in „Avto Stroški in Servisi“). Uporabniki: brata
+**Žiga** in **Nejc** (vloga `sin`) ter **Mama** (vloga `mama`).
+
+1. **Lajf** — mesečni obračun. Vsak brat mami dolguje fiksni znesek na mesec
+   (privzeto 350 €). Nakupi za hišo (Lidl, Hofer, deli za avto …) in plačila
+   mami se odštejejo, posojila od mame prištejejo. Stanje ob koncu meseca
+   (dolg ali dobropis) se **samo prenese** v naslednji mesec.
+2. **Dolg** — „Skupni dolg“ do mame (posojilo za avto), ločen od mesečnih
+   stroškov, z beleženjem odplačil (datum + znesek + opomba).
+3. **Avti** — servisna evidenca Passat, Berlingo, Megane; delitev stroškov
+   med lastnike in poravnava s potrditvijo.
+4. **Domača stran** — kartice za prijavljenega člana; za mamo nadzorna plošča
+   s potrjevanjem plačil.
+
+Vsak član vidi vse v gospodinjstvu, ureja pa samo svoje (mesece, dolgove).
 
 Ogrodje je kopija aplikacije **Cekar** (prijava, SSO iz huba TomsStudios, tema,
 PWA/service worker, UI primitivi, gospodinjstvo s kodo za povabilo). Uporablja
 isti Supabase projekt kot Pisi/Posel/Vzlet/Cekar, tabele imajo predpono `kvit_`.
 
 Stack: Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 ·
-`@supabase/ssr`. Deploy: Vercel. Barva rose `#f43f5e` → violet `#8b5cf6`,
-znak Lucide handshake.
+`@supabase/ssr`. Barva rose `#f43f5e` → violet `#8b5cf6`, znak Lucide
+handshake. Jezik vmesnika: slovenščina.
 
 ## Ukazi
 
 ```bash
 npm install
 npm run dev      # http://localhost:3007
-npm test         # scripts/check-balance.mjs — izračun na podatkih iz Excela
-npm run lint
+npm test         # scripts/check-balance.mjs — izračun (podatki iz Excela) + delitev stroškov avtov
+npm run lint     # 6 opozoril v public/install-promo.js je od prej, napak 0
 npm run build
 ```
 
-## Okoljske spremenljivke (`.env.local`)
+## Okolje, deploy, zbirka aplikacij
 
-```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-```
+- `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  (isti na Vercelu — brez njih produkcija vrne 500 „Your project's URL and Key
+  are required“).
+- GitHub `https://github.com/zig4to/Kvit.git` (veja `main`), Vercel
+  **https://kvit-pearl.vercel.app/** (regija dub1, `vercel.json`), deploy ob
+  pushu na `main`.
+- Registrirano v zbirki: TomsStudios `apps-registry.js` (id `kvit`, podnaslov
+  „Obračun mesečnih stroškov“), Iskra `script.js` `APPS`, zaganjalnik
+  `apps.json` (port 3007). Ob spremembi kartice v TomsStudios povečaj
+  `VERZIJA` v njegovem `sw.js`.
 
 ## Baza (Supabase)
 
-Projekt **ProjektiBaze** (`abjnxhfxjolwwxlckkje`). `0001_init.sql`, `0002_debts.sql` in `0003_cars.sql` so izvedene
-(prek Supabase MCP, 2026-11-05). `src/lib/types/database.types.ts` je **ročno
-napisan** — ob novi migraciji ga posodobi.
+Projekt **ProjektiBaze** (`abjnxhfxjolwwxlckkje`). Vse migracije v
+`supabase/migrations/` so **izvedene** (prek Supabase MCP `apply_migration`,
+2026-11-05/06). `src/lib/types/database.types.ts` je **ročno napisan** — ob
+novi migraciji ga posodobi; `num()` v `src/lib/data/kvit.ts` pretvori numeric
+stolpce (`amount`, `fixed_amount`, `monthly_amount`, `price`, `settle_amount`)
+v številke.
 
-- `kvit_households` (`invite_code`), `kvit_members` (PK `user_id`,
-  `monthly_amount` = privzeti mesečni znesek).
-- `kvit_months` — en mesec enega člana (`month` = 1. dan, unique
-  `(user_id, month)`), `fixed_amount` (za vsak mesec svoj — npr. 60 €, ko je
-  bil cel mesec odsoten), `settled`, `note`.
-- `kvit_entries` — `kind`: `nakup` / `placilo` (odšteje) ali `posojilo`
-  (prišteje), `label`, `amount > 0`, `proof` (`racun` / `potrdilo`), `day`.
+| Migracija | Vsebina |
+|---|---|
+| `0001_init` | `kvit_households` (`invite_code`), `kvit_members` (PK `user_id`, `display_name`, `monthly_amount` 350), `kvit_months` (unique `(user_id, month)`, `month` = 1. dan, `fixed_amount`, `settled`, `note`), `kvit_entries` (`kind` `nakup`/`placilo`/`posojilo`, `label`, `amount > 0`, `proof` `racun`/`potrdilo`, `day`), RLS, RPC `kvit_create_household` / `kvit_join_household`, realtime |
+| `0002_debts` | `kvit_debts` (`label`, `amount` = prvotni znesek, `started_on`), `kvit_debt_payments` (`amount`, `day`, `note`) |
+| `0003_cars` | `kvit_cars` (`name`, `plate`, `position`), `kvit_car_records` (`kind` `servis`/`popravilo`, `day`, `km`, `description`, `next_service_km`, `price`, `paid_by` = ime, `settled`, `note`), `kvit_car_deadlines` (unique `(car_id, name)`, `valid_from`, `valid_until`), `kvit_car_specs`; uvoz podatkov iz Excela |
+| `0004_car_owners` | `kvit_cars.owners text[]` — Passat, Berlingo `{Žiga,Nejc}`, Megane `{Mama}` |
+| `0005_car_photos` | `kvit_cars.photo_path`, zasebni bucket `kvit-avti` (10 MB, slike) |
+| `0006_car_photo_zoom` | `photo_zoom real` 1–2,5 |
+| `0007_car_photo_offset` | `photo_offset real` −40…40 (% višine okvirja, negativno = višje) |
+| `0008_car_settlements` | `kvit_car_settlements` (`from_name`, `to_name`, `amount`, `record_ids uuid[]`, `status` `pending`/`confirmed`/`rejected`) |
+| `0009_mama` | `kvit_members.role` `sin`/`mama`; `kvit_months.settle_requested_at`, `settle_amount`; `kvit_join_household(p_code, p_display_name, p_role default 'sin')`; RPC `kvit_confirm_month`, `kvit_reject_month` (prek `kvit_mama_month`, preverita vlogo mama) |
+| `0010_lock_member_role` | sprožilec: vloge po pridružitvi ni mogoče spremeniti (sicer bi si sin dal vlogo mama in sam potrdil poravnavo) |
+| `0011_receipts` | `kvit_entries.receipt_path`, zasebni bucket `kvit-racuni` |
 
-- `kvit_debts` (`0002`) — dolg do mame (npr. za avto), **ločen od mesečnih
-  stroškov**: `label`, `amount` (prvotni znesek), `started_on`. En član ima
-  lahko več dolgov. `kvit_debt_payments` — odplačila (`amount`, `day`, `note`).
-  Preostanek = `amount − Σ odplačil` (`getDebts` v `src/lib/data/kvit.ts`).
+**RLS:** `kvit_my_household()` (security definer). Vsi člani berejo vse v
+gospodinjstvu. Meseci, vnosi in dolgovi: **piše samo lastnik**
+(`user_id = auth.uid()`, vnosi prek `month_id`). Avti, zapisi, roki, podatki
+in poravnave avtov: vsi člani berejo in pišejo (`for all` prek gospodinjstva).
+Vstop v gospodinjstvo samo prek RPC. Mama tujih mesecev ne more pisati
+neposredno — potrjuje prek security definer RPC.
 
-- `kvit_cars` (`0003`, `name`, `plate`, `position`) + `kvit_car_records`,
-  `kvit_car_deadlines` (unique `(car_id, name)`), `kvit_car_specs`. Avti so
-  **skupni**: vsi člani berejo in urejajo vse (politike `for all` prek `car_id`).
+**Storage** (pot vedno začne z `<household_id>/`):
+- `kvit-avti`: `<household_id>/<car_id>/<uuid>.jpg` — celo gospodinjstvo bere,
+  nalaga, briše.
+- `kvit-racuni`: `<household_id>/<user_id>/<uuid>.jpg` — gospodinjstvo bere,
+  nalaga/briše samo lastnik mape (`foldername[2] = auth.uid()`).
 
-RLS: `kvit_my_household()` (security definer). Vsi člani berejo vse v
-gospodinjstvu, **pišejo samo v svoje mesece** (`user_id = auth.uid()`, vnosi
-prek `month_id`). Vstop samo prek RPC `kvit_create_household` /
-`kvit_join_household`. Realtime: `kvit_entries`, `kvit_months`, `kvit_debts`, `kvit_debt_payments`.
-Dolgovi imajo enaka pravila (bereš vse, pišeš svoje).
+**Realtime:** `kvit_entries`, `kvit_months`, `kvit_debts`,
+`kvit_debt_payments`, `kvit_cars`, `kvit_car_records`, `kvit_car_deadlines`,
+`kvit_car_specs`, `kvit_car_settlements`. Komponente ob spremembi pokličejo
+`router.refresh()` (z zamikom 300 ms).
 
 ## Izračun
 
-`src/lib/kvit/balance.ts` (čiste funkcije brez importov, ker jih uvaža tudi
+`src/lib/kvit/balance.ts` (čiste funkcije **brez importov**, ker jih uvaža tudi
 `scripts/check-balance.mjs` prek Node type stripping):
 
 ```
@@ -78,81 +107,149 @@ za doplačilo = prenos + fiksni + Σ posojila − Σ nakupi − Σ plačila
 prenos nikoli ne preskoči meseca. Ob vsakem pisanju akcija `ensureMonth`
 (`src/actions/kvit.ts`) mesec zapiše in zapolni vrzel. Pred spremembo
 privzetega zneska `setMonthlyAmountAction` zapiše pretekle virtualne mesece s
-starim zneskom, da se zgodovina ne spremeni.
+starim zneskom, da se zgodovina ne spremeni. Prazen mesec pred prvim zapisanim
+(puščica ‹) bi prenesel 350 € naprej — zato zahteva potrditev.
+
+`src/lib/kvit/cars.ts` (prav tako brez importov): `splitNet(records, owners)`
+— neporavnan vnos s ceno: plačnik +cena, vsak lastnik −cena/n (en lastnik =
+nič deljenja); `addNets`; `settlements(net)` (dolžniki → upniki, požrešno);
+`dative` (Žiga → Žigi, Nejc → Nejcu, Mama → Mami).
+
+**Imena:** `paid_by`, `owners`, `from_name`/`to_name` so imena, ne id-ji. Ime
+člana = prva beseda `display_name` (`firstName()` v `src/lib/data/kvit.ts`,
+„Žiga Tomše“ → „Žiga“). Nejc se mora pridružiti z imenom, ki se začne z
+„Nejc“, mama z „Mama“, sicer se zapisi ne povežejo.
 
 ## Arhitektura
 
 Server `src/app/(app)/*/page.tsx` → branje `src/lib/data/kvit.ts`
-(`getLedgers`: člani, meseci, vnosi v enem `Promise.all`, RLS brez filtra) →
-`"use client"` komponente v `src/components/kvit/`. Mutacije: `"use server"`
-v `src/actions/kvit.ts` (`ctx()`, vsaka konča z `revalidatePath("/", "layout")`).
+(`getMembership`, `getLedgers`, `getDebts`, `getCars`, `getCarBalance`,
+`labelSuggestions`) → `"use client"` komponente v `src/components/kvit/`.
+Mutacije: `"use server"` v `src/actions/kvit.ts` (`ctx()` vrne supabase,
+userId, householdId; vsaka konča z `done()` = `revalidatePath("/", "layout")`).
+Obrazci Avti/Dolg uporabljajo `FormParts.tsx` (`useSubmit`, `FormButtons`).
+Ikone so Lucide-slog v `src/components/ui/icons.tsx` (brez emojijev).
 
-- `/` — domača stran, vsak član vidi svoje kartice: na vrhu „Aktualno“ (neporavnani skupni stroški avtov iz mojega pogleda: „Nejcu dolguješ X €“ / „V dobrem imaš X €“, ime = prva beseda `display_name` = `paid_by` → `/avti`), 1. „Lajf“ (stanje tekočega meseca → `/lajf`), 2. „Skupni dolg“ (preostanek, napredek, zadnje odplačilo → `/dolg`).
-- `/lajf` `MonthView` (gumb „Lajf“ v zgornji vrstici, `?oseba=<user_id>&mesec=YYYY-MM`, privzeto jaz in tekoči
-  mesec). Na vrhu zamenjava osebe, ‹ › med meseci (‹ na prvem lastnem mesecu
-  doda prejšnji mesec za vnos zgodovine), kartica „Za doplačilo“ / „Dobropis“ /
-  „Kvit“ z razčlenitvijo (fiksni znesek je mogoče urejati s svinčnikom), opomba
-  meseca, vnosi. Plavajoči gumb „Dodaj“ odpre `EntryDialog` (znesek, vrsta,
-  opis s predlogi iz `labelSuggestions`, račun/potrdilo, dan). Klik na vnos ga
-  uredi ali izbriše. „Poravnaj mesec“ (potrditev na mestu) zapiše plačilo
-  ostanka (če je dolg) in nastavi `settled`.
-- `/dolg` `DebtView` (gumb „Dolg“ v zgornji vrstici, `?oseba=`): kartica na
-  dolg (preostanek, vrstica napredka, seznam odplačil), „+ Odplačilo“, svinčnik
-  za urejanje/brisanje dolga, „Vpiši dolg“. Z mesečnim obračunom ni povezan.
-- `/avti` `CarsView` (gumb „Avti“, `?avto=<id>`): servisna evidenca skupnih
-  avtov po vzoru Excela „Avto Stroški in Servisi“ (Passat, Berlingo, Megane —
-  uvoženi 2026-11-05). Na avto: Pregledi in roki (`kvit_car_deadlines`, oznaka
-  poteklo / še N dni (≤ 30) / velja), Redni servisi in Vzdrževanje in popravila
-  (`kvit_car_records.kind` `servis` / `popravilo`; servis ima naslednji servis
-  v km, popravilo „Plačal“ + Poravnano), Podatki o vozilu (`kvit_car_specs`).
-  Nov avto (`saveCarAction`) dobi 5 privzetih rokov in „Velikost gum“.
-  **Lastniki** (`0004`, `kvit_cars.owners text[]`): Passat in Berlingo Žiga +
-  Nejc (stroški na pol), Megane Mama (plača sama). `src/lib/kvit/cars.ts`
-  (`splitNet`, `settlements`, testi v `scripts/check-balance.mjs`): neporavnani
-  vnosi s ceno in plačnikom → kartica `SplitSummary` na vrhu „Žiga dolguje
-  Nejcu X €“; „Poravnaj“ (`settleCarsAction`) označi vse odprte kot poravnane.
-  Plačal in Poravnano imata servis in popravilo.
-  **Poravnava s potrditvijo** (`0008`, `kvit_car_settlements`): `getCarBalance`
-  (`src/lib/data/kvit.ts`) → `CarBalance` (`src/components/kvit/CarBalance.tsx`, na
-  domači strani „Aktualno“ in na vrhu `/avti`). Dolžnik klikne „Poravnaj“ →
-  `settleCarsAction` zapiše vrstico `pending` (`from_name`, `to_name`, `amount`,
-  `record_ids`); upnik vidi „Žiga pravi, da ti je plačal …“ → Potrdi
-  (`confirmCarSettlementAction`, samo `to_name`; vnosi → `settled`) ali Zavrni,
-  dolžnik lahko prekliče (`rejectCarSettlementAction`). Če „Poravnaj“ klikne
-  upnik, se poravna takoj. Vnosi v čakajoči poravnavi niso več v „dolguje“.
-  Zavihki avtov imajo levo logotip znamke (`CarLogo`, prepoznava po imenu
-  modela: Passat → VW, Berlingo → Citroën, Megane → Renault; SVG v kodi).
-  Razdelki so zložljivi (`Section`), stanje v piškotku `kvit-avti-zlozeno`
-  (`src/lib/kvit/collapsed.ts`, bere ga strežnik — brez utripa).
-  **Slika avta** (`0005`, `kvit_cars.photo_path`, zasebni bucket `kvit-avti`,
-  pot `<household_id>/<car_id>/<uuid>.jpg`): kamera v glavi avta →
-  `uploadCarPhoto` (`src/lib/kvit/car-photo.ts`, pomanjša na 1400 px, nalaga iz
-  brskalnika) → `setCarPhotoAction` (staro datoteko izbriše). Slika nadomesti
-  logotip v glavi (128×80, object-contain); `getCars` naredi začasne povezave (1 h). Povečava slike `photo_zoom` (`0006`, 1–2,5, drsnik v „Uredi avto“, `CarPhoto`: scale z izhodiščem 50 % 35 %, zato se avto ob povečavi pomakne nižje). Navpični zamik `photo_offset` (`0007`, −40…40 % višine okvirja, negativno = višje, drsnik „Položaj slike“).
-  Obrazci uporabljajo `FormParts.tsx` (`useSubmit`, `FormButtons`) kot `DebtView`.
-- **Slika računa** (`0011`, `kvit_entries.receipt_path`, zasebni bucket
-  `kvit-racuni`, pot `<household_id>/<user_id>/<uuid>.jpg` — bere celo
-  gospodinjstvo, nalaga/briše samo lastnik): v `EntryDialog` „Slikaj račun“ →
-  `uploadReceipt` (`src/lib/kvit/car-photo.ts`, 2000 px) takoj ob izbiri, vnos
-  shrani samo pot (`saveEntryAction` preveri predpono, staro sliko izbriše; ob
-  preklicu obrazca se naložene slike pobrišejo). `/lajf` naredi začasne povezave
-  za vnose meseca → sličica na desni vrstice, klik odpre račun.
-- **Mama** (`0009`, `kvit_members.role` `sin` / `mama`, izbira „Kdo si?“ v
-  Onboarding ob pridružitvi): nima mesečnega obračuna (`getLedgers` jo izpusti),
-  `/` ji pokaže `MamaDashboard` — Aktualno (poravnave za potrditev), Ta mesec
-  (stanje obeh sinov), Skupni dolg obeh sinov. Lajf in Dolg vidi samo za branje.
-  Ko je v gospodinjstvu mama, „Poravnaj mesec“ (`settleMonthAction`) samo zapiše
-  `kvit_months.settle_requested_at` + `settle_amount`; mama potrdi z RPC
-  `kvit_confirm_month` (zapiše plačilo „Poravnava“, `settled = true`) ali zavrne
-  (`kvit_reject_month`); oba RPC preverita vlogo. Sin lahko prošnjo prekliče
-  (`unsettleMonthAction`). Brez mame se mesec poravna takoj kot prej. Vloge po
-  pridružitvi ni mogoče spremeniti (sprožilec `0010`).
-- `/zgodovina` — vsi meseci vseh članov s stanjem in kljukico poravnave.
-- `/nastavitve` `Settings` — privzeti mesečni znesek, gospodinjstvo, koda,
-  člani, tema, odjava.
+**Zgornja vrstica** (`src/app/(app)/layout.tsx`): logo Kvit → `/`; glavni
+zavihki **Domov** (hiška), **Lajf** (košarica), **Dolg**, **Avti** — na
+računalniku (≥ 640 px) na sredini vrstice; desno Zgodovina in Nastavitve.
+Uporabnik brez gospodinjstva vidi `Onboarding`.
 
-### PWA / middleware past
+### `/` — domača stran (`src/app/(app)/page.tsx`)
 
-`src/proxy.ts` matcher **mora** izključevati statične `.js` (`sw.js`,
-`install-promo.js`). `public/sw.js` je network-first; ob spremembi povečaj
-`VERZIJA`.
+Sin vidi svoje kartice (`Card`; cela kartica je povezava, razen
+`whole={false}`, kjer je povezava samo glava, ker so v vsebini gumbi):
+1. **Aktualno** → `CarBalance` (skupni stroški avtov iz mojega pogleda:
+   rdeče „Nejcu dolguješ X €“ / zeleno „Žiga ti dolguje X €“, pod tem seznam
+   razlogov „Zimske Gume · Berlingo · plačal Nejc 365 € (pol 182,50 €)“).
+2. **Lajf** — stanje tekočega meseca (Za doplačilo / Dobropis / Kvit,
+   razčlenitev) → `/lajf`.
+3. **Skupni dolg** — preostanek, odplačano, vrstica napredka, zadnje
+   odplačilo → `/dolg`.
+
+Mama vidi `MamaDashboard`: **Aktualno** (prošnje „Nejc pravi, da ti je plačal
+270 € za stroške novembra“ → Potrdi / Zavrni), **Ta mesec** (stanje obeh
+sinov: Plačano / Čaka na tvojo potrditev / Še ni plačal · X €), **Skupni dolg**
+obeh sinov s skupno vsoto.
+
+### Poravnava skupnih stroškov avtov (`CarBalance`, `0008`)
+
+`getCarBalance(supabase, myName)` vrne `owed` (brez vnosov v čakajočih
+poravnavah), `reasons`, `pending`. Dolžnik klikne „Poravnaj“ →
+`settleCarsAction` zapiše `pending` vrstico z `record_ids`; dolžnik vidi
+rumeno „Plačal si Nejcu … — čaka na potrditev“ (Prekliči), upnik zeleno
+„Žiga pravi, da ti je plačal …“ (Potrdi / Zavrni). `confirmCarSettlementAction`
+(samo `to_name`) označi te vnose `settled`. Če „Poravnaj“ klikne upnik, se
+poravna takoj. Prikazano na domači strani in na vrhu `/avti`.
+
+### `/lajf` — mesečni obračun (`MonthView`)
+
+`?oseba=<user_id>&mesec=YYYY-MM`, privzeto jaz in tekoči mesec (mama privzeto
+prvega sina, samo branje). Zamenjava osebe, ‹ › med meseci, kartica „Za
+doplačilo“ / „Dobropis“ / „Kvit“ z razčlenitvijo (fiksni znesek s svinčnikom),
+opomba meseca, vnosi. Plavajoči gumb „Dodaj“ → `EntryDialog` (znesek, vrsta,
+opis s predlogi, dokazilo, dan, **slika računa**). Klik na vnos ga uredi ali
+izbriše.
+
+**Slika računa** (`0011`): „Slikaj račun“ → `uploadReceipt`
+(`src/lib/kvit/car-photo.ts`, pomanjša na 2000 px) naloži takoj ob izbiri iz
+brskalnika, vnos shrani samo pot (`saveEntryAction` preveri predpono
+`<household>/<user>/`, ob zamenjavi/brisanju izbriše staro datoteko; zaprt
+obrazec brez shranjevanja pobriše naložene). Dokazilo se samo nastavi na
+„Račun“. Stran naredi začasne povezave (1 h) za vnose meseca → sličica desno
+v vrstici, klik odpre račun v `Modal`.
+
+**Poravnaj mesec:** brez mame v gospodinjstvu zapiše plačilo ostanka
+(„Poravnava“) in `settled = true`. **Z mamo** samo zapiše
+`settle_requested_at` + `settle_amount` → rumeno „Plačilo mami … čaka na
+mamino potrditev“ (Prekliči = `unsettleMonthAction`); mama potrdi
+(`confirmMonthAction` → RPC `kvit_confirm_month`: zapiše plačilo, `settled`)
+ali zavrne (`kvit_reject_month`).
+
+### `/dolg` — Skupni dolg (`DebtView`)
+
+`?oseba=`, mama je izključena iz seznama oseb (privzeto prvi sin). Kartica na
+dolg (preostanek = `amount − Σ odplačil`, napredek, odplačila), „+ Odplačilo“
+(znesek, datum, opomba), svinčnik za urejanje/brisanje, „Vpiši dolg“
+(privzeto ime „Skupni dolg“). Z mesečnim obračunom ni povezan.
+
+### `/avti` — avti (`CarsView`)
+
+`?avto=<id>`. Zavihki avtov se menjajo **na odjemalcu** (`selectCar` +
+`history.replaceState`), ne z navigacijo — sicer strežnik naredi nove
+podpisane povezave do slik in slika ob menjavi poskoči; slike ostalih avtov
+se naložijo vnaprej (skrit `<img>`), `CarPhoto` ima `key={car.id}`.
+
+Na avto (razdelki zložljivi, `Section`, stanje v piškotku
+`kvit-avti-zlozeno`, bere ga strežnik — brez utripa): **Pregledi in roki**
+(poteklo / še N dni ≤ 30 / velja), **Redni servisi** (naslednji servis v km),
+**Vzdrževanje in popravila** („+ Dodaj“), **Podatki o vozilu**. Servis in
+popravilo imata Plačal (Žiga / Nejc / Mama) in Poravnano. Nov avto
+(`saveCarAction`) dobi 5 privzetih rokov in „Velikost gum“.
+
+Glava avta: slika (`0005`, kamera → `uploadCarPhoto` 1400 px →
+`setCarPhotoAction`) ali logotip znamke (`CarLogo`, SVG, po imenu: Passat →
+VW, Berlingo → Citroën, Megane → Renault). `CarPhoto` 128×80,
+`object-contain object-bottom`, `transform: translateY(offset%) scale(zoom)`
+z izhodiščem `50% 35%`; drsnika „Povečava slike“ in „Položaj slike“ v „Uredi
+avto“. Trenutno: Passat zoom 1,35; Megane zoom 1,15, offset −6.
+
+### Ostalo
+
+- `/zgodovina` — vsi meseci vseh sinov s stanjem in kljukico poravnave.
+- `/nastavitve` `Settings` — privzeti mesečni znesek, gospodinjstvo, koda za
+  povabilo, člani, tema, odjava.
+- `Onboarding` — ustvari gospodinjstvo ali se pridruži s kodo; pri
+  pridružitvi izbira „Kdo si?“ **Sin** / **Mama**.
+
+## Stanje podatkov (2026-11-06)
+
+- V gospodinjstvu je zaenkrat samo **Žiga** („Žiga Tomše“). Nejc in mama se
+  še nista pridružila.
+- Meseci do vključno oktobra 2026 so poravnani izven aplikacije; **november
+  2026 je prvi mesec** in začne s 350 € (brez prenosa). Prazne vrstice za
+  september/oktober so bile izbrisane.
+- Dolg Žiga: 6.941 € („Skupni dolg“). **Dolg Nejc 8.172 € še ni vpisan** —
+  vpiše ga Nejc (ali Claude prek SQL), ko se pridruži.
+- Avti uvoženi iz Excela. Servisna vrstica Megane v Excelu je enaka kot pri
+  Passatu (isti datum in km) — uvožena kot je.
+- Odprt skupni strošek: Zimske Gume, Berlingo, 365 €, plačal Nejc → Žiga
+  dolguje Nejcu 182,50 €.
+
+## Pasti
+
+- **PWA / middleware:** `src/proxy.ts` matcher **mora** izključevati statične
+  `.js` (`sw.js`, `install-promo.js`). `public/sw.js` je network-first; ob
+  spremembi te datoteke povečaj `VERZIJA`.
+- **Push na GitHub:** velik commit (~30 datotek, 3000 vrstic) je GitHub večkrat
+  zavrnil z `! [remote rejected] … (fatal error in commit_refs_rules)` (tudi na
+  novo vejo, brez izpada na githubstatus). Isti spremembe v manjših commitih so
+  šle skozi — commitaj in pushaj sproti v manjših kosih.
+- **Popravki prek `node -e` v bashu:** poševnice se izgubijo (`/\s+/` je
+  postal `/s+/` → ime „Žiga Tom“). Za popravke z regexi ali vzvratnimi
+  poševnicami uporabi Edit ali skripto, zapisano z Write. Datoteke so CRLF —
+  skripte naj normalizirajo `\r\n`.
+- **Podpisane povezave** (`createSignedUrls`) so ob vsakem upodabljanju nove,
+  zato jih brskalnik ne predpomni; izogibaj se nepotrebnim navigacijam.
+- Ne kliči `setState` v `useEffect` (lint `react-hooks/set-state-in-effect`) —
+  za sinhronizacijo s propom uporabi vzorec „prejšnja vrednost v stanju“.
