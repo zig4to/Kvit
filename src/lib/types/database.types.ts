@@ -50,6 +50,27 @@ export type KvitEntry = {
   created_at: string;
 };
 
+// Dolg do mame (npr. za avto), ločen od mesečnih stroškov.
+export type KvitDebt = {
+  id: string;
+  household_id: string;
+  user_id: string;
+  label: string;
+  amount: number; // prvotni znesek dolga
+  started_on: string | null;
+  created_at: string;
+};
+
+export type KvitDebtPayment = {
+  id: string;
+  debt_id: string;
+  amount: number;
+  day: string; // "YYYY-MM-DD"
+  note: string;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type KvitMembership = {
   member: KvitMember;
   household: KvitHousehold;
@@ -62,6 +83,8 @@ export type Database = {
       kvit_members: Table<KvitMember, "user_id" | "household_id">;
       kvit_months: Table<KvitMonth, "household_id" | "user_id" | "month">;
       kvit_entries: Table<KvitEntry, "month_id" | "amount">;
+      kvit_debts: Table<KvitDebt, "household_id" | "user_id" | "amount">;
+      kvit_debt_payments: Table<KvitDebtPayment, "debt_id" | "amount">;
     };
     Views: Record<string, never>;
     Functions: {

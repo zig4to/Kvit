@@ -4,9 +4,9 @@ import { getAuthUser } from "@/lib/supabase/auth";
 import { getMembership } from "@/lib/data/kvit";
 import SsoHashCleanup from "@/components/auth/SsoHashCleanup";
 import Onboarding from "@/components/kvit/Onboarding";
-import { IconHandshake, IconHistory, IconSettings } from "@/components/ui/icons";
+import { IconHandCoins, IconHandshake, IconHistory, IconSettings } from "@/components/ui/icons";
 
-// Ogrodje aplikacije Kvit: zgornja vrstica (logo → domov, zgodovina, nastavitve), pod
+// Ogrodje aplikacije Kvit: zgornja vrstica (logo → domov, dolg, zgodovina, nastavitve), pod
 // njo drseča vsebina. Uporabnik brez gospodinjstva namesto vsebine vidi
 // Onboarding (ustvari gospodinjstvo / pridruži se s kodo).
 export default async function AppLayout({
@@ -31,6 +31,13 @@ export default async function AppLayout({
         </Link>
         {membership && (
           <nav className="flex items-center gap-1">
+            <Link
+              href="/dolg"
+              className="flex items-center gap-1.5 rounded-md p-2 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            >
+              <IconHandCoins className="h-5 w-5" />
+              Dolg
+            </Link>
             <Link
               href="/zgodovina"
               aria-label="Zgodovina"

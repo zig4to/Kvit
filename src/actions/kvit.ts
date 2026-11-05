@@ -287,3 +287,71 @@ export async function deleteEntryAction(id: string): Promise<KvitResult> {
   if (error) return fail(undefined, "Brisanje ni uspelo.");
   return done();
 }
+
+// ===== Dolg (ločen od mesečnih stroškov) =====
+
+const isDay = (d: string | null | undefined) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+export async function saveDebtAction(input: {
+  id?: string;
+  label: string;
+  amount: number;
+  startedOn: string | null;
+}): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  if (!(input.amount > 0)) return { error: "Znesek dolga mora biti večji od 0." };
+  const row = {
+    label: input.label.trim() || "Dolg",
+    amount: Math.round(input.amount * 100) / 100,
+    started_on: isDay(input.startedOn) ? input.startedOn : null,
+  };
+  const { error } = input.id
+    ? await c.supabase.from("kvit_debts").update(row).eq("id", input.id)
+    : await c.supabase
+        .from("kvit_debts")
+        .insert({ ...row, household_id: c.householdId, user_id: c.userId });
+  if (error) return fail(undefined, "Dolga ni bilo mogoče shraniti.");
+  return done();
+}
+
+export async function deleteDebtAction(id: string): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  const { error } = await c.supabase.from("kvit_debts").delete().eq("id", id);
+  if (error) return fail(undefined, "Brisanje ni uspelo.");
+  return done();
+}
+
+export async function saveDebtPaymentAction(input: {
+  id?: string;
+  debtId: string;
+  amount: number;
+  day: string;
+  note: string;
+}): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  if (!(input.amount > 0)) return { error: "Znesek mora biti večji od 0." };
+  if (!isDay(input.day)) return { error: "Izberi datum." };
+  const row = {
+    amount: Math.round(input.amount * 100) / 100,
+    day: input.day,
+    note: input.note.trim(),
+  };
+  const { error } = input.id
+    ? await c.supabase.from("kvit_debt_payments").update(row).eq("id", input.id)
+    : await c.supabase
+        .from("kvit_debt_payments")
+        .insert({ ...row, debt_id: input.debtId, created_by: c.userId });
+  if (error) return fail(undefined, "Plačila ni bilo mogoče shraniti.");
+  return done();
+}
+
+export async function deleteDebtPaymentAction(id: string): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  const { error } = await c.supabase.from("kvit_debt_payments").delete().eq("id", id);
+  if (error) return fail(undefined, "Brisanje ni uspelo.");
+  return done();
+}

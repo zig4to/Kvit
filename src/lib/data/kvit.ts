@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Database,
+  KvitDebt,
+  KvitDebtPayment,
   KvitEntry,
   KvitMember,
   KvitMembership,
@@ -77,6 +79,30 @@ export async function getLedgers(supabase: Supa, untilKey: string): Promise<Memb
       untilKey
     );
     return { member, rows, months: monthMap, entries: entryMap };
+  });
+}
+
+export type DebtWithPayments = KvitDebt & {
+  payments: KvitDebtPayment[]; // najnovejša zgoraj
+  paid: number;
+  remaining: number;
+};
+
+// Dolgovi vseh članov gospodinjstva s plačili (RLS omeji na gospodinjstvo).
+export async function getDebts(supabase: Supa): Promise<DebtWithPayments[]> {
+  const [{ data: debts }, { data: payments }] = await Promise.all([
+    supabase.from("kvit_debts").select("*").order("created_at"),
+    supabase
+      .from("kvit_debt_payments")
+      .select("*")
+      .order("day", { ascending: false })
+      .order("created_at", { ascending: false }),
+  ]);
+  return (debts ?? []).map((raw) => {
+    const debt = num(raw);
+    const own = (payments ?? []).filter((p) => p.debt_id === debt.id).map(num);
+    const paid = Math.round(own.reduce((a, p) => a + p.amount, 0) * 100) / 100;
+    return { ...debt, payments: own, paid, remaining: Math.round((debt.amount - paid) * 100) / 100 };
   });
 }
 

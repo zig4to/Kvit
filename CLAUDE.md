@@ -37,7 +37,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 
 ## Baza (Supabase)
 
-Projekt **ProjektiBaze** (`abjnxhfxjolwwxlckkje`). `0001_init.sql` je izveden
+Projekt **ProjektiBaze** (`abjnxhfxjolwwxlckkje`). `0001_init.sql` in `0002_debts.sql` sta izvedena
 (prek Supabase MCP, 2026-11-05). `src/lib/types/database.types.ts` je **ročno
 napisan** — ob novi migraciji ga posodobi.
 
@@ -49,10 +49,16 @@ napisan** — ob novi migraciji ga posodobi.
 - `kvit_entries` — `kind`: `nakup` / `placilo` (odšteje) ali `posojilo`
   (prišteje), `label`, `amount > 0`, `proof` (`racun` / `potrdilo`), `day`.
 
+- `kvit_debts` (`0002`) — dolg do mame (npr. za avto), **ločen od mesečnih
+  stroškov**: `label`, `amount` (prvotni znesek), `started_on`. En član ima
+  lahko več dolgov. `kvit_debt_payments` — odplačila (`amount`, `day`, `note`).
+  Preostanek = `amount − Σ odplačil` (`getDebts` v `src/lib/data/kvit.ts`).
+
 RLS: `kvit_my_household()` (security definer). Vsi člani berejo vse v
 gospodinjstvu, **pišejo samo v svoje mesece** (`user_id = auth.uid()`, vnosi
 prek `month_id`). Vstop samo prek RPC `kvit_create_household` /
-`kvit_join_household`. Realtime: `kvit_entries`, `kvit_months`.
+`kvit_join_household`. Realtime: `kvit_entries`, `kvit_months`, `kvit_debts`, `kvit_debt_payments`.
+Dolgovi imajo enaka pravila (bereš vse, pišeš svoje).
 
 ## Izračun
 
@@ -85,6 +91,9 @@ v `src/actions/kvit.ts` (`ctx()`, vsaka konča z `revalidatePath("/", "layout")`
   opis s predlogi iz `labelSuggestions`, račun/potrdilo, dan). Klik na vnos ga
   uredi ali izbriše. „Poravnaj mesec“ (potrditev na mestu) zapiše plačilo
   ostanka (če je dolg) in nastavi `settled`.
+- `/dolg` `DebtView` (gumb „Dolg“ v zgornji vrstici, `?oseba=`): kartica na
+  dolg (preostanek, vrstica napredka, seznam odplačil), „+ Odplačilo“, svinčnik
+  za urejanje/brisanje dolga, „Vpiši dolg“. Z mesečnim obračunom ni povezan.
 - `/zgodovina` — vsi meseci vseh članov s stanjem in kljukico poravnave.
 - `/nastavitve` `Settings` — privzeti mesečni znesek, gospodinjstvo, koda,
   člani, tema, odjava.
