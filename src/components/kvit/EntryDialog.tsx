@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Input";
 import { deleteEntryAction, saveEntryAction } from "@/actions/kvit";
 import { amountInput, parseAmount } from "@/lib/kvit/text";
 import { monthKey, todayIso } from "@/lib/kvit/balance";
+import { removeReceipt, uploadReceipt } from "@/lib/kvit/car-photo";
+import { IconCamera, IconTrash } from "@/components/ui/icons";
 import type { EntryKind, EntryProof, KvitEntry } from "@/lib/types/database.types";
 import clsx from "@/lib/utils/clsx";
 
@@ -63,12 +65,18 @@ export default function EntryDialog({
   monthKey: key,
   entry,
   suggestions,
+  householdId,
+  userId,
+  receiptUrl,
 }: {
   open: boolean;
   onClose: () => void;
   monthKey: string;
   entry: KvitEntry | null; // null = nov vnos
   suggestions: string[];
+  householdId: string;
+  userId: string;
+  receiptUrl: string | null; // začasna povezava do obstoječe slike računa
 }) {
   return (
     <Modal open={open} onClose={onClose} title={entry ? "Uredi vnos" : "Nov vnos"}>
@@ -80,6 +88,9 @@ export default function EntryDialog({
           monthKey={key}
           entry={entry}
           suggestions={suggestions}
+          householdId={householdId}
+          userId={userId}
+          receiptUrl={receiptUrl}
         />
       )}
     </Modal>
@@ -91,11 +102,17 @@ function EntryForm({
   monthKey: key,
   entry,
   suggestions,
+  householdId,
+  userId,
+  receiptUrl,
 }: {
   onClose: () => void;
   monthKey: string;
   entry: KvitEntry | null;
   suggestions: string[];
+  householdId: string;
+  userId: string;
+  receiptUrl: string | null;
 }) {
   const [amount, setAmount] = useState(entry ? amountInput(entry.amount) : "");
   const [label, setLabel] = useState(entry?.label ?? "");
@@ -103,6 +120,36 @@ function EntryForm({
   const [proof, setProof] = useState<EntryProof | null>(entry?.proof ?? null);
   const [day, setDay] = useState(entry ? (entry.day ?? "") : key === monthKey() ? todayIso() : "");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Slika računa: naloži se takoj ob izbiri, vnos dobi samo pot.
+  const [receiptPath, setReceiptPath] = useState<string | null>(entry?.receipt_path ?? null);
+  const [preview, setPreview] = useState<string | null>(entry?.receipt_path ? receiptUrl : null);
+  const [uploading, setUploading] = useState(false);
+  const fresh = useRef<string[]>([]); // naložene v tem obrazcu
+  const saved = useRef(false);
+  // Zaprt brez shranjevanja → pobriši naložene slike, da ne ostanejo sirote.
+  useEffect(() => {
+    const list = fresh.current;
+    return () => {
+      if (!saved.current) list.forEach((p) => void removeReceipt(p));
+    };
+  }, []);
+
+  const pickReceipt = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const p = await uploadReceipt(file, householdId, userId);
+      fresh.current.push(p);
+      setReceiptPath(p);
+      setPreview(URL.createObjectURL(file));
+      if (!proof) setProof("racun");
+    } catch {
+      setError("Slike računa ni bilo mogoče naložiti.");
+    } finally {
+      setUploading(false);
+    }
+  };
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -127,9 +174,15 @@ function EntryForm({
         amount: value,
         proof,
         day: day || null,
+        receiptPath,
       });
       if (res.error) setError(res.error);
-      else onClose();
+      else {
+        saved.current = true;
+        // Naložene, a zamenjane slike niso več potrebne.
+        fresh.current.filter((p) => p !== receiptPath).forEach((p) => void removeReceipt(p));
+        onClose();
+      }
     });
   };
 
@@ -208,6 +261,45 @@ function EntryForm({
         </Field>
       </div>
 
+      <div>
+        <p className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Slika računa</p>
+        {preview ? (
+          <div className="flex items-center gap-3">
+            <a href={preview} target="_blank" rel="noreferrer" className="block flex-shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element -- lokalni predogled / začasna povezava */}
+              <img src={preview} alt="Račun" className="h-24 w-20 rounded-md border border-gray-200 object-cover dark:border-gray-700" />
+            </a>
+            <div className="flex flex-col items-start gap-1.5">
+              <label className="cursor-pointer text-sm text-rose-600 hover:underline dark:text-rose-400">
+                {uploading ? "Nalagam …" : "Zamenjaj"}
+                <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => pickReceipt(e.target.files?.[0])} />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setReceiptPath(null);
+                  setPreview(null);
+                }}
+                className="flex items-center gap-1 text-sm text-gray-500 hover:text-red-600 dark:text-gray-400"
+              >
+                <IconTrash className="h-3.5 w-3.5" /> Odstrani
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label
+            className={clsx(
+              "flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800",
+              uploading && "pointer-events-none opacity-60"
+            )}
+          >
+            <IconCamera className="h-5 w-5" />
+            {uploading ? "Nalagam …" : "Slikaj račun"}
+            <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => pickReceipt(e.target.files?.[0])} />
+          </label>
+        )}
+      </div>
+
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="flex items-center justify-between gap-2">
@@ -228,7 +320,7 @@ function EntryForm({
           <Button type="button" variant="secondary" onClick={onClose}>
             Prekliči
           </Button>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending || uploading}>
             {pending ? "Shranjujem …" : "Shrani"}
           </Button>
         </div>

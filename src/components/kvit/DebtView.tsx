@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -13,8 +13,8 @@ import {
   deleteDebtPaymentAction,
   saveDebtAction,
   saveDebtPaymentAction,
-  type KvitResult,
 } from "@/actions/kvit";
+import { FormButtons, useSubmit } from "@/components/kvit/FormParts";
 import { todayIso } from "@/lib/kvit/balance";
 import { amountInput, formatEur, parseAmount } from "@/lib/kvit/text";
 import type { DebtWithPayments } from "@/lib/data/kvit";
@@ -253,60 +253,6 @@ export default function DebtView({
           />
         )}
       </Modal>
-    </div>
-  );
-}
-
-// Skupni del obrazcev: shrani / izbriši (s potrditvijo) / prekliči.
-function useSubmit(onClose: () => void) {
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const run = (action: () => Promise<KvitResult>) => {
-    setError(null);
-    startTransition(async () => {
-      const res = await action();
-      if (res.error) setError(res.error);
-      else onClose();
-    });
-  };
-  return { error, setError, pending, run };
-}
-
-function FormButtons({
-  onClose,
-  onDelete,
-  pending,
-  deleteLabel,
-}: {
-  onClose: () => void;
-  onDelete?: () => void;
-  pending: boolean;
-  deleteLabel: string;
-}) {
-  const [confirm, setConfirm] = useState(false);
-  return (
-    <div className="flex items-center justify-between gap-2">
-      {onDelete ? (
-        confirm ? (
-          <Button type="button" variant="danger" disabled={pending} onClick={onDelete}>
-            {deleteLabel}
-          </Button>
-        ) : (
-          <Button type="button" variant="ghost" onClick={() => setConfirm(true)}>
-            Izbriši
-          </Button>
-        )
-      ) : (
-        <span />
-      )}
-      <div className="flex gap-2">
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Prekliči
-        </Button>
-        <Button type="submit" disabled={pending}>
-          {pending ? "Shranjujem …" : "Shrani"}
-        </Button>
-      </div>
     </div>
   );
 }

@@ -435,3 +435,34 @@ export const IconHandCoins = (p: SVGProps<SVGSVGElement>) => (
     <circle cx="6" cy="5" r="3" />
   </Base>
 );
+
+export const IconCar = (p: SVGProps<SVGSVGElement>) => (
+  <Base {...p}>
+    <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+    <circle cx="7" cy="17" r="2" />
+    <path d="M9 17h6" />
+    <circle cx="17" cy="17" r="2" />
+  </Base>
+);
+
+export const IconWrench = (p: SVGProps<SVGSVGElement>) => (
+  <Base {...p}>
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+  </Base>
+);
+
+export const IconHammer = (p: SVGProps<SVGSVGElement>) => (
+  <Base {...p}>
+    <path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9" />
+    <path d="m18 15 4-4" />
+    <path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-1.13a6 6 0 0 0-2.648-.62H12l.88.88a2 2 0 0 1 .52 1.85L13 9l.6.6" />
+  </Base>
+);
+
+export const IconInfo = (p: SVGProps<SVGSVGElement>) => (
+  <Base {...p}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </Base>
+);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import PromptDialog from "@/components/ui/PromptDialog";
 import EntryDialog, { KINDS } from "@/components/kvit/EntryDialog";
 import { IconCheck, IconChevronLeft, IconChevronRight, IconPencil, IconPlus } from "@/components/ui/icons";
@@ -42,6 +43,10 @@ export default function MonthView({
   note,
   editable,
   suggestions,
+  settleRequest,
+  hasMama,
+  householdId,
+  receiptUrls,
 }: {
   people: PersonTab[];
   personId: string;
@@ -52,11 +57,16 @@ export default function MonthView({
   note: string | null;
   editable: boolean;
   suggestions: string[];
+  settleRequest: { amount: number } | null; // „Poravnaj“ čaka na mamino potrditev
+  hasMama: boolean; // poravnavo potrdi mama
+  householdId: string;
+  receiptUrls: Record<string, string>; // id vnosa → začasna povezava do slike računa
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<{ entry: KvitEntry | null } | null>(null);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [confirmSettle, setConfirmSettle] = useState(false);
+  const [viewReceipt, setViewReceipt] = useState<string | null>(null);
   const [confirmAddPrev, setConfirmAddPrev] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -80,7 +90,7 @@ export default function MonthView({
     };
   }, [router]);
 
-  const href = (key: string, person = personId) => `/?oseba=${person}&mesec=${key}`;
+  const href = (key: string, person = personId) => `/lajf?oseba=${person}&mesec=${key}`;
 
   const run = (action: () => Promise<{ error?: string }>) => {
     setError(null);
@@ -313,18 +323,31 @@ export default function MonthView({
                   </span>
                 </>
               );
+              const receipt = receiptUrls[e.id];
               return (
-                <li key={e.id}>
+                <li key={e.id} className="flex items-center">
                   {editable ? (
                     <button
                       type="button"
                       onClick={() => setDialog({ entry: e })}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                      className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60"
                     >
                       {content}
                     </button>
                   ) : (
-                    <div className="flex items-center gap-3 px-4 py-2.5">{content}</div>
+                    <div className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5">{content}</div>
+                  )}
+                  {receipt && (
+                    <button
+                      type="button"
+                      aria-label="Pokaži račun"
+                      title="Pokaži račun"
+                      onClick={() => setViewReceipt(receipt)}
+                      className="mr-3 flex-shrink-0 overflow-hidden rounded border border-gray-200 hover:ring-2 hover:ring-rose-300 dark:border-gray-700"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- začasna povezava iz zasebnega bucketa */}
+                      <img src={receipt} alt="" className="h-10 w-8 object-cover" />
+                    </button>
                   )}
                 </li>
               );
@@ -335,7 +358,25 @@ export default function MonthView({
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
+      {!row.settled && settleRequest && (
+        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <p>
+            {settleRequest.amount > 0
+              ? <>Plačilo mami <span className="font-bold tabular-nums">{formatEur(settleRequest.amount)}</span> čaka na mamino potrditev.</>
+              : "Poravnava meseca čaka na mamino potrditev."}
+          </p>
+          {editable && (
+            <div className="flex justify-end">
+              <Button variant="secondary" disabled={pending} onClick={() => run(() => unsettleMonthAction(row.key))}>
+                Prekliči
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {editable &&
+        !settleRequest &&
         (row.settled ? (
           <div className="text-center">
             <button
@@ -350,9 +391,13 @@ export default function MonthView({
         ) : confirmSettle ? (
           <div className="space-y-2 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-800">
             <p>
-              {balance > 0.004
-                ? `Zapišem plačilo ${formatEur(balance)} mami in označim mesec kot poravnan?`
-                : "Označim mesec kot poravnan?"}
+              {hasMama
+                ? balance > 0.004
+                  ? `Si plačal mami ${formatEur(balance)}? Mama mora plačilo še potrditi.`
+                  : "Označim mesec kot poravnan? Mama mora še potrditi."
+                : balance > 0.004
+                  ? `Zapišem plačilo ${formatEur(balance)} mami in označim mesec kot poravnan?`
+                  : "Označim mesec kot poravnan?"}
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setConfirmSettle(false)}>
@@ -365,7 +410,7 @@ export default function MonthView({
                   run(() => settleMonthAction(row.key, balance));
                 }}
               >
-                Poravnaj
+                {hasMama && balance > 0.004 ? "Da, plačal sem" : "Poravnaj"}
               </Button>
             </div>
           </div>
@@ -391,7 +436,18 @@ export default function MonthView({
         monthKey={row.key}
         entry={dialog?.entry ?? null}
         suggestions={suggestions}
+        householdId={householdId}
+        userId={personId}
+        receiptUrl={dialog?.entry ? (receiptUrls[dialog.entry.id] ?? null) : null}
       />
+      <Modal open={viewReceipt !== null} onClose={() => setViewReceipt(null)} title="Račun">
+        {viewReceipt && (
+          <a href={viewReceipt} target="_blank" rel="noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element -- začasna povezava iz zasebnega bucketa */}
+            <img src={viewReceipt} alt="Račun" className="max-h-[75vh] w-full rounded-md object-contain" />
+          </a>
+        )}
+      </Modal>
       <PromptDialog
         open={prompt !== null}
         onClose={() => setPrompt(null)}
