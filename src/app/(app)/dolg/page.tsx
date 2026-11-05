@@ -14,13 +14,19 @@ export default async function DebtPage({
   if (!user) return null;
 
   const [{ data: members }, debts] = await Promise.all([
-    supabase.from("kvit_members").select("user_id, display_name").order("joined_at"),
+    supabase.from("kvit_members").select("user_id, display_name, role").order("joined_at"),
     getDebts(supabase),
   ]);
-  const all = members ?? [];
-  if (!all.some((m) => m.user_id === user.id)) return null; // layout pokaže Onboarding
+  if (!(members ?? []).some((m) => m.user_id === user.id)) return null; // layout pokaže Onboarding
+  // Dolg imajo samo sinovi; mama vidi oba (samo branje), privzeto prvega.
+  const all = (members ?? []).filter((m) => m.role !== "mama");
+  if (all.length === 0) return null;
 
-  const personId = all.some((m) => m.user_id === params.oseba) ? params.oseba! : user.id;
+  const personId = all.some((m) => m.user_id === params.oseba)
+    ? params.oseba!
+    : all.some((m) => m.user_id === user.id)
+      ? user.id
+      : all[0].user_id;
   const people = [
     ...all.filter((m) => m.user_id === user.id),
     ...all.filter((m) => m.user_id !== user.id),

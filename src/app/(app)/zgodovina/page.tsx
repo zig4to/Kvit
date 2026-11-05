@@ -20,7 +20,7 @@ export default async function HistoryPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Link href="/" aria-label="Nazaj" className="rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
+        <Link href="/lajf" aria-label="Nazaj" className="rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <IconArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="text-xl font-semibold">Zgodovina</h1>
@@ -39,7 +39,7 @@ export default async function HistoryPage() {
               {[...l.rows].reverse().map((r) => (
                 <li key={r.key}>
                   <Link
-                    href={`/?oseba=${l.member.user_id}&mesec=${r.key}`}
+                    href={`/lajf?oseba=${l.member.user_id}&mesec=${r.key}`}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/60"
                   >
                     <span className="flex-1">{monthLabel(r.key)}</span>
