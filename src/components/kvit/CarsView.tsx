@@ -14,12 +14,13 @@ import {
   IconChevronDown,
   IconHammer,
   IconInfo,
+  IconEuro,
   IconPencil,
   IconPlus,
   IconWrench,
 } from "@/components/ui/icons";
 import CarLogo from "@/components/kvit/CarLogo";
-import { setSectionCollapsed } from "@/lib/kvit/collapsed";
+import { setSectionOpen } from "@/lib/kvit/collapsed";
 import { FormButtons, useSubmit } from "@/components/kvit/FormParts";
 import {
   deleteCarAction,
@@ -172,7 +173,7 @@ function SplitSummary({ cars, balance }: { cars: CarDetail[]; balance: Balance }
       <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">
         Skupni stroški · {joinNames(shared.map((c) => c.name))} · na pol
       </p>
-      <CarBalance balance={balance} />
+      <CarBalance balance={balance} collapsible />
     </section>
   );
 }
@@ -245,27 +246,27 @@ export default function CarsView({
   cars,
   carId,
   memberNames,
-  initialCollapsed,
+  initialOpen,
   balance,
 }: {
   cars: CarDetail[];
   balance: Balance; // kdo komu dolguje (iz pogleda prijavljenega člana)
   carId: string | null;
   memberNames: string[]; // za izbiro „Plačal“
-  initialCollapsed: string[]; // zloženi razdelki (piškotek kvit-avti-zlozeno)
+  initialOpen: string[]; // odprti razdelki (piškotek kvit-avti-odprto), ostali zaprti
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [collapsed, setCollapsed] = useState(() => new Set(initialCollapsed));
+  const [open, setOpen] = useState(() => new Set(initialOpen));
   const toggle = (id: string) => {
-    const next = new Set(collapsed);
+    const next = new Set(open);
     const now = !next.has(id);
     if (now) next.add(id);
     else next.delete(id);
-    setCollapsed(next);
-    setSectionCollapsed(id, now);
+    setOpen(next);
+    setSectionOpen(id, now);
   };
-  const sec = (id: string) => ({ collapsed: collapsed.has(id), onToggle: () => toggle(id) });
+  const sec = (id: string) => ({ collapsed: !open.has(id), onToggle: () => toggle(id) });
   // Zavihek avta se zamenja na odjemalcu (brez novega nalaganja strani), zato
   // ostanejo začasne povezave do slik enake in slike iz predpomnilnika.
   const [selectedId, setSelectedId] = useState(carId);
@@ -305,6 +306,19 @@ export default function CarsView({
   const lastKm = car ? Math.max(0, ...car.records.map((r) => r.km ?? 0)) : 0;
   const repairsTotal = repairs.reduce((a, r) => a + (r.price ?? 0), 0);
   const nextService = services.find((s) => s.next_service_km !== null)?.next_service_km ?? null;
+  // Stroški avta po letih (servisi + popravila s ceno), najnovejše leto zgoraj.
+  const yearly = (() => {
+    const map = new Map<string, { year: string; service: number; repair: number }>();
+    for (const r of car?.records ?? []) {
+      if (!r.price) continue;
+      const year = r.day?.slice(0, 4) ?? "";
+      const y = map.get(year) ?? { year, service: 0, repair: 0 };
+      if (r.kind === "servis") y.service += r.price;
+      else y.repair += r.price;
+      map.set(year, y);
+    }
+    return [...map.values()].sort((a, b) => (a.year === "" ? 1 : b.year === "" ? -1 : b.year.localeCompare(a.year)));
+  })();
 
   return (
     <div className="space-y-4">
@@ -525,6 +539,41 @@ export default function CarsView({
                         {s.note && <span className="block text-xs font-normal text-gray-500">{s.note}</span>}
                       </span>
                     </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          {/* Rožnata črta loči povzetek stroškov od evidence (barva kot rob kartice Aktualno). */}
+          <hr className="border-t border-rose-400 dark:border-rose-600" />
+
+          <Section
+            title="Stroški po letih"
+            icon={<IconEuro className="h-4 w-4" />}
+            count={yearly.length}
+            {...sec("stroski")}
+          >
+            {yearly.length === 0 ? (
+              <Empty text="Ni stroškov s ceno." />
+            ) : (
+              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                {yearly.map((y) => (
+                  <li key={y.year} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{y.year || "Brez datuma"}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {[
+                          y.service > 0 && `servisi ${formatEur(y.service)}`,
+                          y.repair > 0 && `popravila ${formatEur(y.repair)}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                    <span className="whitespace-nowrap text-sm font-semibold tabular-nums">
+                      {formatEur(y.service + y.repair)}
+                    </span>
                   </li>
                 ))}
               </ul>

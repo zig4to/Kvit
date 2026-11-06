@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { firstName, getCarBalance, getCars } from "@/lib/data/kvit";
 import CarsView from "@/components/kvit/CarsView";
-import { CARS_COLLAPSED_COOKIE, parseCollapsed } from "@/lib/kvit/collapsed";
+import { CARS_OPEN_COOKIE, parseOpen } from "@/lib/kvit/collapsed";
 
 // Servisna evidenca avtov (?avto=<id>, privzeto prvi).
 export default async function CarsPage({
@@ -32,7 +32,7 @@ export default async function CarsPage({
       balance={balance}
       carId={params.avto ?? null}
       memberNames={memberNames}
-      initialCollapsed={parseCollapsed(jar.get(CARS_COLLAPSED_COOKIE)?.value)}
+      initialOpen={parseOpen(jar.get(CARS_OPEN_COOKIE)?.value)}
     />
   );
 }
