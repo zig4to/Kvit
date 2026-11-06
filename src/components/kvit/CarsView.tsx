@@ -309,30 +309,32 @@ export default function CarsView({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+        {/* Zavihki si enakomerno razdelijo širino zaslona (basis-0), brez drsenja. */}
+        <div className="flex min-w-0 flex-1 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
           {cars.map((c) => (
             <button
               type="button"
               key={c.id}
               onClick={() => selectCar(c.id)}
               className={clsx(
-                "flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium",
+                "flex min-w-0 flex-1 basis-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-1.5 text-sm font-medium sm:px-3",
                 c.id === car?.id
                   ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-gray-100"
                   : "text-gray-500 dark:text-gray-400"
               )}
             >
-              <CarLogo name={c.name} className="h-5 w-5" />
-              {c.name}
+              <CarLogo name={c.name} className="h-5 w-5 shrink-0" />
+              <span className="truncate">{c.name}</span>
             </button>
           ))}
         </div>
+        {/* Na telefonu skrito (zaenkrat so trije avti); nov avto se doda na računalniku. */}
         <button
           type="button"
           aria-label="Dodaj avto"
           title="Dodaj avto"
           onClick={() => setDialog({ type: "car", car: null })}
-          className="rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="hidden rounded-md p-2 text-gray-500 hover:bg-gray-100 sm:block dark:hover:bg-gray-800"
         >
           <IconPlus className="h-5 w-5" />
         </button>
