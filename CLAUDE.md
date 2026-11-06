@@ -221,7 +221,9 @@ avto“. Trenutno: Passat zoom 1,35; Megane zoom 1,15, offset −10.
 - `/zgodovina` — strežniška stran z zavihki `?zavihek=lajf|dolg|avti`:
   **Lajf** (`?oseba=`, vsi meseci osebe z vsemi vnosi in stanjem ob koncu
   meseca), **Dolg** (vsa odplačila: sin samo svoja, mama obeh), **Avti**
-  (vsi servisi/popravila vseh avtov po mesecih). Oznake vrst vnosov so tam
+  (vsi servisi/popravila vseh avtov po mesecih; meseci zložljivi z
+  `<details>`, odprt najnovejši; prikazani zadnji 3, „Naloži več“ doda 3 prek
+  `?mesecev=`). Oznake vrst vnosov so tam
   podvojene, ker je `KINDS` v `"use client"` modulu.
 - `/nastavitve` `Settings` — privzeti mesečni znesek, gospodinjstvo, koda za
   povabilo, člani, tema, odjava.

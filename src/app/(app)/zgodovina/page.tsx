@@ -11,6 +11,7 @@ import {
   IconBasket,
   IconCar,
   IconCheck,
+  IconChevronDown,
   IconHandCoins,
 } from "@/components/ui/icons";
 
@@ -42,7 +43,7 @@ const fmtDay = (d: string) => {
 export default async function HistoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ zavihek?: string; oseba?: string }>;
+  searchParams: Promise<{ zavihek?: string; oseba?: string; mesecev?: string }>;
 }) {
   const supabase = await createClient();
   const [user, params] = await Promise.all([getAuthUser(supabase), searchParams]);
@@ -86,7 +87,9 @@ export default async function HistoryPage({
 
       {tab === "lajf" && <LajfHistory userId={user.id} personParam={params.oseba} />}
       {tab === "dolg" && <DebtHistory userId={user.id} isMama={isMama} members={members ?? []} />}
-      {tab === "avti" && <CarHistory />}
+      {tab === "avti" && (
+        <CarHistory limit={Math.max(MONTHS_STEP, Number(params.mesecev) || MONTHS_STEP)} />
+      )}
     </div>
   );
 }
@@ -253,7 +256,9 @@ async function DebtHistory({
 
 // ——— Avti ———
 
-async function CarHistory() {
+const MONTHS_STEP = 3; // Avti: zadnji 3 meseci, „Naloži več“ doda še 3 (?mesecev=)
+
+async function CarHistory({ limit }: { limit: number }) {
   const supabase = await createClient();
   const cars = await getCars(supabase);
   const records = cars
@@ -268,18 +273,23 @@ async function CarHistory() {
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
 
+  const all = [...groups];
+  const shown = all.slice(0, limit);
+
   return (
     <div className="space-y-4">
-      {[...groups].map(([key, list]) => (
-        <section key={key || "brez"} className={CARD}>
-          <h2 className={MONTH_HEAD}>
+      {/* Meseci so zložljivi (<details>, brez JS); odprt je samo najnovejši. */}
+      {shown.map(([key, list], i) => (
+        <details key={key || "brez"} open={i === 0} className={clsx(CARD, "group overflow-hidden")}>
+          <summary className="flex cursor-pointer list-none items-center gap-2 border-gray-100 px-4 py-2.5 font-semibold hover:bg-gray-50 group-open:border-b dark:border-gray-800 dark:hover:bg-gray-800/60 [&::-webkit-details-marker]:hidden">
+            <IconChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-gray-400 transition-transform group-open:rotate-0" />
             <span className="flex-1">{key ? monthLabel(key) : "Brez datuma"}</span>
             {list.some((r) => r.price) && (
               <span className="text-sm font-normal tabular-nums text-gray-500 dark:text-gray-400">
                 {formatEur(list.reduce((a, r) => a + (r.price ?? 0), 0))}
               </span>
             )}
-          </h2>
+          </summary>
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {list.map((r) => (
               <li key={r.id}>
@@ -313,8 +323,18 @@ async function CarHistory() {
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       ))}
+      {all.length > shown.length && (
+        <Link
+          href={`/zgodovina?zavihek=avti&mesecev=${limit + MONTHS_STEP}`}
+          replace
+          scroll={false}
+          className="block rounded-xl border border-gray-200 py-2.5 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/60"
+        >
+          Naloži več
+        </Link>
+      )}
     </div>
   );
 }
