@@ -76,6 +76,7 @@ v številke.
 | `0011_receipts` | `kvit_entries.receipt_path`, zasebni bucket `kvit-racuni` |
 | `0012_shared_expenses` | `kvit_shared_expenses` (`label`, `amount` = cel nakup, `paid_by`, `owed_by` = imena, `share` = koliko dolguje, `day`, `settled`); več dolžnikov = ena vrstica na dolžnika; RLS `for all` prek gospodinjstva |
 | `0013_remove_redni_servis_deadline` | izbriše prazne roke „Redni servis“ (servisi so v razdelku Redni servisi) |
+| `0014_debt_payment_approval` | `kvit_debt_payments.status` `pending`/`confirmed`/`rejected` (obstoječa `confirmed`), `resolved_at`; sprožilec `kvit_debt_payments_status` (z mamo v gospodinjstvu: nov vnos ali sprememba zneska/datuma → `pending`, sin stanja ne more spremeniti; brez mame → `confirmed`); RPC `kvit_confirm_debt_payment` / `kvit_reject_debt_payment` (samo mama) |
 
 **RLS:** `kvit_my_household()` (security definer). Vsi člani berejo vse v
 gospodinjstvu. Meseci, vnosi in dolgovi: **piše samo lastnik**
@@ -164,9 +165,16 @@ Sin vidi svoje kartice (`Card`; cela kartica je povezava, razen
    gumba svinčnik in Odplačilo kličeta `stopPropagation`; „Skupaj še“).
 
 Mama vidi `MamaDashboard`: **Aktualno** (prošnje „Nejc pravi, da ti je plačal
-270 € za stroške novembra“ → Potrdi / Zavrni), **Ta mesec** (stanje obeh
+270 € za stroške novembra“ in „Žiga pravi, da ti je odplačal 200 € od dolga
+…“ (`debtRequests`, `0014`) → Potrdi / Zavrni), **Ta mesec** (stanje obeh
 sinov: Plačano / Čaka na tvojo potrditev / Še ni plačal · X €), **Skupni dolg**
 obeh sinov s skupno vsoto.
+
+**Začasno, za testiranje:** gumb **Mati** (oko) v zgornji vrstici (samo sin)
+→ `/?pogled=mama` pokaže sinu `MamaDashboard`; v predogledu je gumb obarvan
+(„Predogled: mama“ ×, `MamaPreviewToggle`, klik → `/`).
+Potrditve še vedno preveri strežnik (RPC dovoli samo vlogi mama). Ko ni več
+potreben, odstrani `MamaPreviewToggle` iz `layout.tsx` in `pogled` v `page.tsx`.
 
 ### Poravnava skupnih stroškov avtov (`CarBalance`, `0008`)
 
@@ -210,7 +218,8 @@ ali zavrne (`kvit_reject_month`).
 Sin vidi samo svoj dolg (brez zavihkov oseb, `?oseba=` tujega sina se
 prezre). Mama vidi oba sinova (`?oseba=`, privzeto prvi sin, samo branje),
 sama je izključena iz seznama. Kartica na
-dolg (preostanek = `amount − Σ odplačil`, napredek, odplačila), „+ Odplačilo“
+dolg (preostanek = `amount − Σ potrjenih odplačil`, napredek, odplačila z oznako
+„čaka na potrditev“ / „zavrnjeno“, `pending` = vsota čakajočih), „+ Odplačilo“
 (znesek, datum, opomba), svinčnik za urejanje/brisanje, „Vpiši dolg“
 (privzeto ime „Skupni dolg“). Z mesečnim obračunom ni povezan.
 
