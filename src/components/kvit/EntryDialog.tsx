@@ -24,7 +24,7 @@ const PROOFS: { id: EntryProof | null; label: string }[] = [
   { id: "potrdilo", label: "Potrdilo" },
 ];
 
-function Segmented<T extends string | null>({
+export function Segmented<T extends string | null>({
   value,
   options,
   onChange,

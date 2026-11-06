@@ -411,7 +411,7 @@ export async function deleteDebtPaymentAction(id: string): Promise<KvitResult> {
 
 // ===== Avti (skupni za gospodinjstvo) =====
 
-const DEFAULT_DEADLINES = ["Redni servis", "Tehnični pregled", "Registracija", "Zavarovanje", "Vinjeta"];
+const DEFAULT_DEADLINES = ["Tehnični pregled", "Registracija", "Zavarovanje", "Vinjeta"];
 
 export async function saveCarAction(input: {
   id?: string;
@@ -469,26 +469,41 @@ export async function settleCarsAction(): Promise<KvitResult> {
   if (c.error !== undefined) return { error: c.error };
   const me = await myFirstName(c);
   const balance = await getCarBalance(c.supabase, me);
-  const ids = balance.reasons.map((r) => r.id);
-  if (ids.length === 0) return {};
-  const toConfirm = balance.owed.filter((o) => o.to !== me);
-  if (toConfirm.length === 0) {
-    // Sem upnik (ali se vse izide): denar sem dobil, poravnam takoj.
-    const { error } = await c.supabase.from("kvit_car_records").update({ settled: true }).in("id", ids);
-    if (error) return fail(undefined, "Poravnava ni uspela.");
-    return done();
+  // Poravnava po parih: samo vnosi, pri katerih sem udeležen. Če komu dolgujem
+  // (neto), plačilo čaka na potrditev upnika — z vnosi tega para; dolgov drugih
+  // do mene se takrat ne dotakne (gumb pove „Si plačal …?“). Če samo terjam,
+  // je to „Si dobil denar?“ → moji vnosi se poravnajo takoj. Pari, ki se
+  // izidejo na nič, se poravnajo takoj.
+  const debtorTo = new Set(balance.owed.filter((o) => o.from === me).map((o) => o.to));
+  const creditorOf = new Set(balance.owed.filter((o) => o.to === me).map((o) => o.from));
+  const pendingIds = new Map<string, string[]>([...debtorTo].map((to) => [to, []]));
+  const direct: string[] = [];
+  for (const r of balance.reasons) {
+    const others = r.debts
+      .filter((d) => d.from === me || d.to === me)
+      .map((d) => (d.from === me ? d.to : d.from));
+    if (others.length === 0) continue;
+    const owe = others.find((o) => debtorTo.has(o));
+    if (owe) pendingIds.get(owe)!.push(r.id);
+    else if (debtorTo.size === 0 || !others.some((o) => creditorOf.has(o))) direct.push(r.id);
   }
-  const { error } = await c.supabase.from("kvit_car_settlements").insert(
-    toConfirm.map((o) => ({
-      household_id: c.householdId,
-      from_name: o.from,
-      to_name: o.to,
-      amount: o.amount,
-      record_ids: ids,
-      created_by: c.userId,
-    }))
-  );
-  if (error) return fail(undefined, "Poravnava ni uspela.");
+  if (direct.length === 0 && debtorTo.size === 0) return {};
+  if (direct.length > 0 && !(await markSettled(c, direct))) return fail(undefined, "Poravnava ni uspela.");
+  if (debtorTo.size > 0) {
+    const { error } = await c.supabase.from("kvit_car_settlements").insert(
+      balance.owed
+        .filter((o) => o.from === me)
+        .map((o) => ({
+          household_id: c.householdId,
+          from_name: o.from,
+          to_name: o.to,
+          amount: o.amount,
+          record_ids: pendingIds.get(o.to) ?? [],
+          created_by: c.userId,
+        }))
+    );
+    if (error) return fail(undefined, "Poravnava ni uspela.");
+  }
   return done();
 }
 
@@ -500,15 +515,69 @@ export async function confirmCarSettlementAction(id: string): Promise<KvitResult
   const { data: s } = await c.supabase.from("kvit_car_settlements").select("*").eq("id", id).maybeSingle();
   if (!s || s.status !== "pending") return { error: "Poravnava ne čaka več na potrditev." };
   if (s.to_name !== me) return { error: `Plačilo lahko potrdi samo ${s.to_name}.` };
-  if (s.record_ids.length > 0) {
-    const { error } = await c.supabase.from("kvit_car_records").update({ settled: true }).in("id", s.record_ids);
-    if (error) return fail(undefined, "Potrditev ni uspela.");
+  if (s.record_ids.length > 0 && !(await markSettled(c, s.record_ids))) {
+    return fail(undefined, "Potrditev ni uspela.");
   }
   const { error } = await c.supabase
     .from("kvit_car_settlements")
     .update({ status: "confirmed", resolved_by: c.userId, resolved_at: new Date().toISOString() })
     .eq("id", id);
   if (error) return fail(undefined, "Potrditev ni uspela.");
+  return done();
+}
+
+// Poravnava pokrije vnose avtov in skupne stroške (id-ji iz obeh tabel).
+async function markSettled(c: Ctx, ids: string[]) {
+  const [records, expenses] = await Promise.all([
+    c.supabase.from("kvit_car_records").update({ settled: true }).in("id", ids),
+    c.supabase.from("kvit_shared_expenses").update({ settled: true }).in("id", ids),
+  ]);
+  return !records.error && !expenses.error;
+}
+
+export type SharedExpenseInput = {
+  id?: string;
+  label: string;
+  amount: number;
+  paidBy: string;
+  owedBy: string[]; // več dolžnikov → ena vrstica na dolžnika (urejanje: točno en)
+  share: number; // koliko dolguje vsak
+  day: string;
+};
+
+// Skupni strošek (gumb „Dodaj strošek“ na domači strani): kdo je plačal,
+// kdo dolguje in koliko (cel znesek, pol ali poljuben znesek).
+export async function saveSharedExpenseAction(input: SharedExpenseInput): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  const label = input.label.trim();
+  const amount = Math.round(input.amount * 100) / 100;
+  const share = Math.round(input.share * 100) / 100;
+  if (!label) return { error: "Vpiši, kaj si kupil." };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: "Vpiši znesek." };
+  if (!Number.isFinite(share) || share <= 0) return { error: "Vpiši, koliko dolguje." };
+  const debtors = [...new Set(input.owedBy)];
+  if (debtors.length === 0) return { error: "Izberi, kdo dolguje." };
+  if (input.id && debtors.length !== 1) return { error: "Pri urejanju je dolžnik lahko samo en." };
+  if (share * debtors.length > amount + 0.01) return { error: "Deleži skupaj ne morejo biti večji od zneska." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.day)) return { error: "Neveljaven datum." };
+  const { data: members } = await c.supabase.from("kvit_members").select("display_name");
+  const names = new Set((members ?? []).map((m) => firstName(m.display_name)));
+  if (![input.paidBy, ...debtors].every((n) => names.has(n))) return { error: "Izberi člana gospodinjstva." };
+  if (debtors.includes(input.paidBy)) return { error: "Plačnik ne more biti tudi dolžnik." };
+  const rows = debtors.map((owed_by) => ({ label, amount, share, paid_by: input.paidBy, owed_by, day: input.day }));
+  const { error } = input.id
+    ? await c.supabase.from("kvit_shared_expenses").update(rows[0]).eq("id", input.id).eq("settled", false)
+    : await c.supabase.from("kvit_shared_expenses").insert(rows);
+  if (error) return fail(undefined, "Shranjevanje ni uspelo.");
+  return done();
+}
+
+export async function deleteSharedExpenseAction(id: string): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  const { error } = await c.supabase.from("kvit_shared_expenses").delete().eq("id", id);
+  if (error) return fail(undefined, "Brisanje ni uspelo.");
   return done();
 }
 

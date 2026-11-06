@@ -143,6 +143,21 @@ export type KvitCarSettlement = {
   resolved_at: string | null;
 };
 
+// Skupni strošek izven avtov (0012): paid_by plačal amount, owed_by dolguje share.
+export type KvitSharedExpense = {
+  id: string;
+  household_id: string;
+  label: string;
+  amount: number; // cel nakup
+  paid_by: string; // ime plačnika
+  owed_by: string; // ime dolžnika
+  share: number; // koliko dolguje owed_by
+  day: string;
+  settled: boolean;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type KvitMembership = {
   member: KvitMember;
   household: KvitHousehold;
@@ -162,6 +177,7 @@ export type Database = {
       kvit_car_deadlines: Table<KvitCarDeadline, "car_id" | "name">;
       kvit_car_specs: Table<KvitCarSpec, "car_id" | "name">;
       kvit_car_settlements: Table<KvitCarSettlement, "from_name" | "to_name" | "amount">;
+      kvit_shared_expenses: Table<KvitSharedExpense, "label" | "amount" | "paid_by" | "owed_by" | "share">;
     };
     Views: Record<string, never>;
     Functions: {

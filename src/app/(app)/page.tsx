@@ -5,12 +5,14 @@ import { getAuthUser } from "@/lib/supabase/auth";
 import { firstName, getCarBalance, getDebts, getLedgers, getMembership } from "@/lib/data/kvit";
 import MamaDashboard from "@/components/kvit/MamaDashboard";
 import CarBalance from "@/components/kvit/CarBalance";
+import Reveal from "@/components/kvit/Reveal";
 import { monthKey, monthLabel } from "@/lib/kvit/balance";
 import { formatEur } from "@/lib/kvit/text";
 import { IconBasket, IconCheck, IconChevronRight, IconHandCoins, IconInfo } from "@/components/ui/icons";
 
 // Domača stran: vsak član vidi svoje kartice (podatki prijavljenega člana).
-// 0. Aktualno — kdo komu dolguje za skupne avte (moj pogled) → /avti
+// 0. Aktualno — kdo komu dolguje za skupne avte in stroške (moj pogled) → /avti;
+//    gumb „Dodaj strošek“ (ExpenseDialog)
 // 1. Lajf — stanje tekočega meseca (za doplačilo / dobropis / kvit) → /lajf
 // 2. Skupni dolg — preostanek dolga do mame in napredek odplačevanja → /dolg
 export default async function HomePage() {
@@ -59,8 +61,21 @@ export default async function HomePage() {
   const mine = ledgers.find((l) => l.member.user_id === user.id);
   if (!mine) return null; // layout pokaže Onboarding
 
-  // Aktualno: neporavnani skupni stroški avtov in poravnave, ki čakajo na potrditev.
-  const carBalance = await getCarBalance(supabase, firstName(mine.member.display_name));
+  // Aktualno: neporavnani skupni stroški (avti + Dodaj strošek) in poravnave,
+  // ki čakajo na potrditev. Imena vseh članov (tudi mame) za obrazec stroška.
+  const [carBalance, { data: members }] = await Promise.all([
+    getCarBalance(supabase, firstName(mine.member.display_name)),
+    supabase.from("kvit_members").select("display_name, role").order("joined_at"),
+  ]);
+  // Sinova najprej, mama na koncu.
+  const names = [
+    ...new Set(
+      [...(members ?? [])]
+        .sort((a, b) => Number(a.role === "mama") - Number(b.role === "mama"))
+        .map((m) => firstName(m.display_name))
+        .filter(Boolean)
+    ),
+  ];
   // Lajf
   const row = mine.rows.find((r) => r.key === current) ?? mine.rows[mine.rows.length - 1];
   const balance = row?.balance ?? 0;
@@ -83,9 +98,9 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-3">
-      <Card href="/avti" whole={false} accent icon={<IconInfo className="h-5 w-5" />} title="Aktualno" subtitle="Skupni stroški avtov">
+      <Card href="/avti" whole={false} accent icon={<IconInfo className="h-5 w-5" />} title="Aktualno" subtitle="Skupni stroški">
         <div className="mt-3">
-          <CarBalance balance={carBalance} />
+          <CarBalance balance={carBalance} collapsible names={names} />
         </div>
       </Card>
 
@@ -116,24 +131,26 @@ export default async function HomePage() {
           <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">Dolg še ni vpisan.</p>
         ) : (
           <>
-            <div className="mt-3 flex items-end justify-between gap-2">
+            {/* Zneski so zamegljeni, dokler ne klikneš nanje (klik ne odpre /dolg). */}
+            <Reveal className="-mx-1 mt-2 flex items-end justify-between gap-2 px-1 py-1">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{remaining > 0 ? "Preostanek" : "Odplačano"}</p>
                 <p
                   className={clsx(
                     "text-3xl font-bold tabular-nums",
+                    HIDDEN,
                     remaining > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                   )}
                 >
                   {formatEur(remaining > 0 ? remaining : total)}
                 </p>
               </div>
-              <p className="text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
+              <p className={clsx("text-right text-xs tabular-nums text-gray-500 dark:text-gray-400", HIDDEN)}>
                 od {formatEur(total)}
                 <br />
                 odplačano {formatEur(paid)}
               </p>
-            </div>
+            </Reveal>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
               <div className="h-full rounded-full bg-emerald-500" style={{ width: `${progress}%` }} />
             </div>
@@ -149,6 +166,10 @@ export default async function HomePage() {
     </div>
   );
 }
+
+// Zamegljeno znotraj <Reveal>, dokler ga ne klikneš.
+const HIDDEN =
+  "transition-[filter] duration-200 group-data-[shown=false]/reveal:select-none group-data-[shown=false]/reveal:blur-sm";
 
 // Kartica: privzeto je cela povezava; z whole={false} (gumbi v vsebini) je
 // povezava samo glava.

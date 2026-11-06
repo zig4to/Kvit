@@ -12,9 +12,10 @@ import type {
   KvitMember,
   KvitMembership,
   KvitMonth,
+  KvitSharedExpense,
 } from "@/lib/types/database.types";
 import { computeLedger, type LedgerRow } from "@/lib/kvit/balance";
-import { addNets, settlements, splitNet } from "@/lib/kvit/cars";
+import { pairDebts, recordDebts, type Debt } from "@/lib/kvit/cars";
 
 type Supa = SupabaseClient<Database>;
 
@@ -40,7 +41,7 @@ export async function getMembership(
 // numeric pride iz PostgREST kot niz — pretvori v število.
 function num<T extends object>(row: T): T {
   const r = { ...row } as Record<string, unknown>;
-  for (const k of ["amount", "fixed_amount", "monthly_amount", "price", "settle_amount"]) {
+  for (const k of ["amount", "fixed_amount", "monthly_amount", "price", "settle_amount", "share"]) {
     if (k in r && r[k] !== null) r[k] = Number(r[k]);
   }
   return r as T;
@@ -174,23 +175,26 @@ export const firstName = (displayName: string) => displayName.trim().split(/\s+/
 export type CarReason = {
   id: string;
   text: string;
-  car: string;
+  car: string | null; // null = skupni strošek izven avtov (kvit_shared_expenses)
   paidBy: string;
   price: number;
-  share: number; // delež enega lastnika
+  share: number; // delež enega lastnika (avto) oziroma koliko dolguje owedBy (strošek)
+  owedBy?: string; // samo strošek
+  expense?: KvitSharedExpense; // samo strošek — za urejanje
+  debts: Debt[]; // kdo komu dolguje zaradi tega vnosa (za poravnavo po parih)
 };
 
 export type CarBalance = {
   myName: string;
-  owed: { from: string; to: string; amount: number }[]; // brez vnosov, ki čakajo na potrditev
+  owed: Debt[]; // neto po parih, brez vnosov, ki čakajo na potrditev
   reasons: CarReason[]; // odprti vnosi, ki tvorijo `owed`
   pending: (KvitCarSettlement & { reasons: CarReason[] })[];
 };
 
-// Kdo komu dolguje za skupne avte. Vnosi iz poravnav, ki čakajo na potrditev,
-// niso več v `owed` — prikažejo se pri `pending`.
+// Kdo komu dolguje za skupne avte in skupne stroške (Dodaj strošek). Vnosi iz
+// poravnav, ki čakajo na potrditev, niso več v `owed` — prikažejo se pri `pending`.
 export async function getCarBalance(supabase: Supa, myName: string): Promise<CarBalance> {
-  const [{ data: cars }, { data: records }, { data: pending }] = await Promise.all([
+  const [{ data: cars }, { data: records }, { data: pending }, { data: expenses }] = await Promise.all([
     supabase.from("kvit_cars").select("id, name, owners"),
     supabase
       .from("kvit_car_records")
@@ -199,11 +203,13 @@ export async function getCarBalance(supabase: Supa, myName: string): Promise<Car
       .not("price", "is", null)
       .order("day"),
     supabase.from("kvit_car_settlements").select("*").eq("status", "pending").order("created_at"),
+    supabase.from("kvit_shared_expenses").select("*").eq("settled", false).order("day").order("created_at"),
   ]);
   const shared = new Map((cars ?? []).filter((c) => c.owners.length > 1).map((c) => [c.id, c]));
   const open = (records ?? [])
     .filter((r) => shared.has(r.car_id) && Number(r.price) > 0 && r.paid_by.trim())
     .map((r) => ({ ...r, price: Number(r.price) }));
+  const openExp = (expenses ?? []).map((e) => ({ ...num(e), share: Number(e.share) }));
   const toReason = (r: (typeof open)[number]): CarReason => {
     const car = shared.get(r.car_id)!;
     return {
@@ -213,21 +219,31 @@ export async function getCarBalance(supabase: Supa, myName: string): Promise<Car
       paidBy: r.paid_by.trim(),
       price: r.price,
       share: Math.round((r.price / car.owners.length) * 100) / 100,
+      debts: recordDebts(r, car.owners),
     };
   };
+  const expReason = (e: (typeof openExp)[number]): CarReason => ({
+    id: e.id,
+    text: e.label.trim() || "Strošek",
+    car: null,
+    paidBy: e.paid_by,
+    price: e.amount,
+    share: e.share,
+    owedBy: e.owed_by,
+    expense: e,
+    debts: [{ from: e.owed_by, to: e.paid_by, amount: e.share }],
+  });
   const pendingRows = (pending ?? []).map((p) => ({ ...p, amount: Number(p.amount) }));
   const inPending = new Set(pendingRows.flatMap((p) => p.record_ids));
-  const free = open.filter((r) => !inPending.has(r.id));
-  const net = addNets(
-    [...shared.values()].map((c) => splitNet(free.filter((r) => r.car_id === c.id), c.owners))
-  );
+  const reasonsOf = (ids: (id: string) => boolean) => [
+    ...open.filter((r) => ids(r.id)).map(toReason),
+    ...openExp.filter((e) => ids(e.id)).map(expReason),
+  ];
+  const reasons = reasonsOf((id) => !inPending.has(id));
   return {
     myName,
-    owed: settlements(net),
-    reasons: free.map(toReason),
-    pending: pendingRows.map((p) => ({
-      ...p,
-      reasons: open.filter((r) => p.record_ids.includes(r.id)).map(toReason),
-    })),
+    owed: pairDebts(reasons.flatMap((r) => r.debts)),
+    reasons,
+    pending: pendingRows.map((p) => ({ ...p, reasons: reasonsOf((id) => p.record_ids.includes(id)) })),
   };
 }

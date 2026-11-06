@@ -75,6 +75,25 @@ assert.deepEqual(settlements(splitNet([{ price: 100, paid_by: "Mama", settled: f
   { from: "Žiga", to: "Mama", amount: 50 },
   { from: "Nejc", to: "Mama", amount: 50 },
 ]);
+// Po parih: Žiga dolguje Nejcu 182,50 (gume), Nejc Žigi 13,33, Mama Žigi 13,33 → brez „Mama dolguje Nejcu“
+const { recordDebts, pairDebts } = await import("../src/lib/kvit/cars.ts");
+assert.deepEqual(
+  pairDebts([
+    ...recordDebts({ price: 365, paid_by: "Nejc", settled: false }, owners),
+    { from: "Nejc", to: "Žiga", amount: 13.33 },
+    { from: "Mama", to: "Žiga", amount: 13.33 },
+  ]),
+  [
+    { from: "Žiga", to: "Nejc", amount: 169.17 },
+    { from: "Mama", to: "Žiga", amount: 13.33 },
+  ]
+);
+assert.deepEqual(recordDebts({ price: 100, paid_by: "Mama", settled: false }, owners), [
+  { from: "Žiga", to: "Mama", amount: 50 },
+  { from: "Nejc", to: "Mama", amount: 50 },
+]);
+assert.deepEqual(recordDebts({ price: 50, paid_by: "Mama", settled: false }, ["Mama"]), []);
+assert.deepEqual(pairDebts([{ from: "Žiga", to: "Nejc", amount: 10 }, { from: "Nejc", to: "Žiga", amount: 10 }]), []);
 assert.equal(dative("Žiga"), "Žigi");
 assert.equal(dative("Nejc"), "Nejcu");
 assert.equal(dative("Mama"), "Mami");

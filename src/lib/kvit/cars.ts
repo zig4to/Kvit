@@ -24,7 +24,39 @@ export function splitNet(records: SplitRecord[], owners: string[]): Map<string, 
   return net;
 }
 
-// Seštevek neto stanj več avtov.
+// Dolg enega člana drugemu (from dolguje to).
+export type Debt = { from: string; to: string; amount: number };
+
+// Dolgovi iz vnosa avta: vsak lastnik razen plačnika dolguje plačniku cena/n.
+export function recordDebts(r: SplitRecord, owners: string[]): Debt[] {
+  const payer = r.paid_by.trim();
+  if (owners.length < 2 || r.settled || !r.price || !payer) return [];
+  const share = r.price / owners.length;
+  return owners.filter((o) => o !== payer).map((o) => ({ from: o, to: payer, amount: share }));
+}
+
+// Neto po parih: kdo komu dolguje, brez preusmerjanja prek tretjega
+// (Mama dolguje Žigi, Žiga Nejcu → ostaneta dva dolga, ne „Mama dolguje Nejcu“).
+export function pairDebts(debts: Debt[]): Debt[] {
+  const pair = new Map<string, Debt>();
+  for (const d of debts) {
+    if (d.from === d.to || !(d.amount > 0)) continue;
+    const [a, b] = [d.from, d.to].sort();
+    const key = `${a}\u0000${b}`;
+    const p = pair.get(key) ?? { from: a, to: b, amount: 0 }; // amount > 0: a dolguje b
+    p.amount += d.from === a ? d.amount : -d.amount;
+    pair.set(key, p);
+  }
+  const out: Debt[] = [];
+  for (const p of pair.values()) {
+    const amount = round2(Math.abs(p.amount));
+    if (amount < 0.005) continue;
+    out.push(p.amount > 0 ? { from: p.from, to: p.to, amount } : { from: p.to, to: p.from, amount });
+  }
+  return out;
+}
+
+// Seštevek neto stanj več avtov (in skupnih stroškov).
 export function addNets(nets: Map<string, number>[]): Map<string, number> {
   const out = new Map<string, number>();
   for (const n of nets) for (const [k, v] of n) out.set(k, round2((out.get(k) ?? 0) + v));
