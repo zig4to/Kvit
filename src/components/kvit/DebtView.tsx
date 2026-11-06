@@ -17,6 +17,11 @@ import {
 import { FormButtons, useSubmit } from "@/components/kvit/FormParts";
 import { todayIso } from "@/lib/kvit/balance";
 import { amountInput, formatEur, parseAmount } from "@/lib/kvit/text";
+import Reveal from "@/components/kvit/Reveal";
+
+// Zamegljeno znotraj <Reveal>, dokler ga ne klikneš (kot na domači strani).
+const HIDDEN =
+  "transition-[filter] duration-200 group-data-[shown=false]/reveal:select-none group-data-[shown=false]/reveal:blur-sm";
 import type { DebtWithPayments } from "@/lib/data/kvit";
 import type { KvitDebtPayment } from "@/lib/types/database.types";
 import type { PersonTab } from "@/components/kvit/MonthView";
@@ -100,13 +105,13 @@ export default function DebtView({
           </p>
         </div>
         {debts.length > 1 && (
-          <p className="text-right text-sm text-gray-500 dark:text-gray-400">
+          <Reveal className="text-right text-sm text-gray-500 dark:text-gray-400">
             Skupaj še
             <br />
-            <span className="text-base font-semibold text-rose-600 dark:text-rose-400">
+            <span className={clsx("inline-block text-base font-semibold text-rose-600 dark:text-rose-400", HIDDEN)}>
               {formatEur(total)}
             </span>
-          </p>
+          </Reveal>
         )}
       </div>
 
@@ -126,12 +131,12 @@ export default function DebtView({
             key={d.id}
             className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
           >
-            <div className="p-5">
+            <Reveal className="p-5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{d.label}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatEur(d.amount)}
+                    <span className={clsx("inline-block", HIDDEN)}>{formatEur(d.amount)}</span>
                     {d.started_on && ` · od ${fmtDay(d.started_on)}`}
                   </p>
                 </div>
@@ -139,7 +144,10 @@ export default function DebtView({
                   <button
                     type="button"
                     aria-label="Uredi dolg"
-                    onClick={() => setDialog({ type: "debt", debt: d })}
+                    onClick={(e) => {
+                      e.stopPropagation(); // ne razkrije zneskov
+                      setDialog({ type: "debt", debt: d });
+                    }}
                     className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
                   >
                     <IconPencil />
@@ -153,6 +161,7 @@ export default function DebtView({
               <p
                 className={clsx(
                   "text-4xl font-bold tabular-nums",
+                  HIDDEN,
                   done ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                 )}
               >
@@ -166,19 +175,24 @@ export default function DebtView({
                 />
               </div>
               <p className="mt-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                <span>Odplačano {formatEur(d.paid)}</span>
+                <span>
+                  Odplačano <span className={clsx("inline-block", HIDDEN)}>{formatEur(d.paid)}</span>
+                </span>
                 <span>{Math.round(pct)} %</span>
               </p>
 
               {editable && !done && (
                 <Button
                   className="mt-4 w-full"
-                  onClick={() => setDialog({ type: "payment", debt: d, payment: null })}
+                  onClick={(e) => {
+                    e.stopPropagation(); // ne razkrije zneskov
+                    setDialog({ type: "payment", debt: d, payment: null });
+                  }}
                 >
                   <IconPlus /> Odplačilo
                 </Button>
               )}
-            </div>
+            </Reveal>
 
             {d.payments.length > 0 && (
               <ul className="divide-y divide-gray-100 border-t border-gray-100 dark:divide-gray-800 dark:border-gray-800">
