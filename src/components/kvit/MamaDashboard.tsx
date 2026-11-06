@@ -66,7 +66,7 @@ export default function MamaDashboard({
 
   return (
     <div className="space-y-3">
-      <section className={CARD}>
+      <section className="rounded-xl border border-rose-600 bg-white p-4 dark:border-rose-400 dark:bg-gray-900">
         <Header icon={<IconInfo className="h-5 w-5" />} title="Aktualno" subtitle="Plačila za potrditev" />
         <div className="mt-3 space-y-2">
           {requests.length === 0 ? (

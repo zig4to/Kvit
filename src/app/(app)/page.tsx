@@ -83,7 +83,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-3">
-      <Card href="/avti" whole={false} icon={<IconInfo className="h-5 w-5" />} title="Aktualno" subtitle="Skupni stroški avtov">
+      <Card href="/avti" whole={false} accent icon={<IconInfo className="h-5 w-5" />} title="Aktualno" subtitle="Skupni stroški avtov">
         <div className="mt-3">
           <CarBalance balance={carBalance} />
         </div>
@@ -155,6 +155,7 @@ export default async function HomePage() {
 function Card({
   href,
   whole = true,
+  accent = false,
   icon,
   title,
   subtitle,
@@ -162,13 +163,17 @@ function Card({
 }: {
   href: string;
   whole?: boolean;
+  /** Tanek rožnat rob (kartica Aktualno). */
+  accent?: boolean;
   icon: React.ReactNode;
   title: string;
   subtitle: string;
   children: React.ReactNode;
 }) {
-  const box =
-    "block rounded-xl border border-gray-200 bg-white p-4 transition dark:border-gray-800 dark:bg-gray-900";
+  const box = clsx(
+    "block rounded-xl border bg-white p-4 transition dark:bg-gray-900",
+    accent ? "border-rose-600 dark:border-rose-400" : "border-gray-200 dark:border-gray-800",
+  );
   const hover = "hover:border-rose-300 hover:shadow-sm dark:hover:border-rose-800";
   const header = (
     <div className="flex items-center gap-2">
