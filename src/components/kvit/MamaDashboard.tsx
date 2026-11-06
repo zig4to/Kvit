@@ -6,12 +6,20 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import { IconBasket, IconCheck, IconHandCoins, IconInfo } from "@/components/ui/icons";
-import { confirmMonthAction, rejectMonthAction, type KvitResult } from "@/actions/kvit";
+import {
+  confirmDebtPaymentAction,
+  confirmMonthAction,
+  rejectDebtPaymentAction,
+  rejectMonthAction,
+  type KvitResult,
+} from "@/actions/kvit";
 import { monthGenitive, monthLabel } from "@/lib/kvit/balance";
 import { formatEur } from "@/lib/kvit/text";
 import clsx from "@/lib/utils/clsx";
 
 export type MamaRequest = { monthId: string; name: string; monthKey: string; amount: number };
+// Odplačilo dolga, ki čaka na potrditev (0014).
+export type MamaDebtRequest = { paymentId: string; name: string; debtLabel: string; amount: number; day: string; note: string };
 export type MamaSonMonth = {
   userId: string;
   name: string;
@@ -24,14 +32,16 @@ export type MamaSonDebt = { userId: string; name: string; total: number; paid: n
 
 const CARD = "rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900";
 
-// Nadzorna plošča za mamo: poravnave za potrditev (Aktualno), ta mesec obeh
-// sinov in skupni dolg obeh sinov.
+// Nadzorna plošča za mamo: poravnave mesecev in odplačila dolga za potrditev
+// (Aktualno), ta mesec obeh sinov in skupni dolg obeh sinov.
 export default function MamaDashboard({
   requests,
+  debtRequests,
   months,
   debts,
 }: {
   requests: MamaRequest[];
+  debtRequests: MamaDebtRequest[];
   months: MamaSonMonth[];
   debts: MamaSonDebt[];
 }) {
@@ -69,7 +79,7 @@ export default function MamaDashboard({
       <section className="rounded-xl border border-rose-600 bg-white p-4 dark:border-rose-400 dark:bg-gray-900">
         <Header icon={<IconInfo className="h-5 w-5" />} title="Aktualno" subtitle="Plačila za potrditev" />
         <div className="mt-3 space-y-2">
-          {requests.length === 0 ? (
+          {requests.length === 0 && debtRequests.length === 0 ? (
             <p className="flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
               <IconCheck className="h-4 w-4" /> Ni plačil za potrditev
             </p>
@@ -104,6 +114,27 @@ export default function MamaDashboard({
               </div>
             ))
           )}
+          {debtRequests.map((r) => (
+            <div
+              key={r.paymentId}
+              className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40"
+            >
+              <p className="text-sm text-emerald-900 dark:text-emerald-200">
+                <span className="font-semibold">{r.name}</span> pravi, da ti je odplačal{" "}
+                <span className="font-bold tabular-nums">{formatEur(r.amount)}</span> od dolga „{r.debtLabel}“ (
+                {new Date(r.day + "T12:00:00").toLocaleDateString("sl-SI")}).
+              </p>
+              {r.note && <p className="mt-0.5 text-xs text-emerald-800/80 dark:text-emerald-300/80">{r.note}</p>}
+              <div className="mt-2 flex justify-end gap-2">
+                <Button variant="secondary" disabled={busy} onClick={() => run(() => rejectDebtPaymentAction(r.paymentId))}>
+                  Zavrni
+                </Button>
+                <Button disabled={busy} onClick={() => run(() => confirmDebtPaymentAction(r.paymentId))}>
+                  <IconCheck /> Potrdi
+                </Button>
+              </div>
+            </div>
+          ))}
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         </div>
       </section>

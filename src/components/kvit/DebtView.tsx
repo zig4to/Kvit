@@ -177,6 +177,12 @@ export default function DebtView({
               <p className="mt-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
                 <span>
                   Odplačano <span className={clsx("inline-block", HIDDEN)}>{formatEur(d.paid)}</span>
+                  {d.pending > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      {" "}
+                      · čaka <span className={clsx("inline-block", HIDDEN)}>{formatEur(d.pending)}</span>
+                    </span>
+                  )}
                 </span>
                 <span>{Math.round(pct)} %</span>
               </p>
@@ -200,12 +206,30 @@ export default function DebtView({
                   const content = (
                     <>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm">{fmtDay(p.day)}</p>
+                        <p className="text-sm">
+                          {fmtDay(p.day)}
+                          {p.status === "pending" && (
+                            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              čaka na potrditev
+                            </span>
+                          )}
+                          {p.status === "rejected" && (
+                            <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-950 dark:text-red-300">
+                              zavrnjeno
+                            </span>
+                          )}
+                        </p>
                         {p.note && (
                           <p className="truncate text-xs text-gray-500 dark:text-gray-400">{p.note}</p>
                         )}
                       </div>
-                      <span className="whitespace-nowrap text-sm font-semibold tabular-nums">
+                      <span
+                        className={clsx(
+                          "whitespace-nowrap text-sm font-semibold tabular-nums",
+                          p.status === "pending" && "text-amber-600 dark:text-amber-400",
+                          p.status === "rejected" && "text-gray-400 line-through dark:text-gray-500"
+                        )}
+                      >
                         −{formatEur(p.amount)}
                       </span>
                     </>

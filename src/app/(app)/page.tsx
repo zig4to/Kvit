@@ -15,9 +15,12 @@ import { IconBasket, IconCheck, IconChevronRight, IconHandCoins, IconInfo } from
 //    gumb „Dodaj strošek“ (ExpenseDialog)
 // 1. Lajf — stanje tekočega meseca (za doplačilo / dobropis / kvit) → /lajf
 // 2. Skupni dolg — preostanek dolga do mame in napredek odplačevanja → /dolg
-export default async function HomePage() {
+// ?pogled=mama — ZA TESTIRANJE: sin vidi mamino nadzorno ploščo (gumb „Mati“
+// v zgornji vrstici, v predogledu obarvan „Predogled: mama“ ×). Potrditve in zavrnitve še vedno preverja strežnik (RPC
+// kvit_confirm_month dovoli samo vlogi mama), zato sin z njimi ne more nič.
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ pogled?: string }> }) {
   const supabase = await createClient();
-  const user = await getAuthUser(supabase);
+  const [user, params] = await Promise.all([getAuthUser(supabase), searchParams]);
   if (!user) return null;
 
   const current = monthKey();
@@ -28,7 +31,8 @@ export default async function HomePage() {
   ]);
 
   // Mama: nadzorna plošča (ledgers so samo sinovi).
-  if (membership?.member.role === "mama") {
+  const isMama = membership?.member.role === "mama";
+  if (isMama || params.pogled === "mama") {
     const name = (l: (typeof ledgers)[number]) => l.member.display_name || "Brez imena";
     return (
       <MamaDashboard
@@ -36,6 +40,15 @@ export default async function HomePage() {
           [...l.months.values()]
             .filter((m) => m.settle_requested_at && !m.settled)
             .map((m) => ({ monthId: m.id, name: name(l), monthKey: m.month.slice(0, 7), amount: m.settle_amount ?? 0 }))
+        )}
+        debtRequests={ledgers.flatMap((l) =>
+          debts
+            .filter((d) => d.user_id === l.member.user_id)
+            .flatMap((d) =>
+              d.payments
+                .filter((p) => p.status === "pending")
+                .map((p) => ({ paymentId: p.id, name: name(l), debtLabel: d.label, amount: p.amount, day: p.day, note: p.note }))
+            )
         )}
         months={ledgers.map((l) => {
           const r = l.rows.find((x) => x.key === current) ?? l.rows[l.rows.length - 1];
@@ -92,8 +105,10 @@ export default async function HomePage() {
   const paid = myDebts.reduce((a, d) => a + d.paid, 0);
   const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
   const progress = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+  const pendingPaid = Math.round(myDebts.reduce((a, d) => a + d.pending, 0) * 100) / 100;
   const lastPayment = myDebts
     .flatMap((d) => d.payments)
+    .filter((p) => p.status === "confirmed")
     .sort((a, b) => (a.day < b.day ? 1 : -1))[0];
 
   return (
@@ -158,6 +173,11 @@ export default async function HomePage() {
               <p className="mt-2 text-xs tabular-nums text-gray-500 dark:text-gray-400">
                 Zadnje odplačilo {formatEur(lastPayment.amount)} ·{" "}
                 {new Date(lastPayment.day + "T12:00:00").toLocaleDateString("sl-SI")}
+              </p>
+            )}
+            {pendingPaid > 0 && (
+              <p className="mt-2 text-xs font-medium tabular-nums text-amber-600 dark:text-amber-400">
+                Odplačilo {formatEur(pendingPaid)} čaka na mamino potrditev
               </p>
             )}
           </>

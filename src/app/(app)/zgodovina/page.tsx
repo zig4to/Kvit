@@ -233,14 +233,30 @@ async function DebtHistory({
                 {payments.map((p) => (
                   <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{fmtDay(p.day)}</p>
+                      <p className="text-sm font-medium">
+                        {fmtDay(p.day)}
+                        {p.status === "pending" && (
+                          <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400">čaka na potrditev</span>
+                        )}
+                        {p.status === "rejected" && (
+                          <span className="ml-2 text-xs font-normal text-red-600 dark:text-red-400">zavrnjeno</span>
+                        )}
+                      </p>
                       {(p.note || own.length > 1) && (
                         <p className="truncate text-xs text-gray-500 dark:text-gray-400">
                           {[own.length > 1 && p.debtLabel, p.note].filter(Boolean).join(" · ")}
                         </p>
                       )}
                     </div>
-                    <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    <span
+                      className={
+                        p.status === "confirmed"
+                          ? "whitespace-nowrap text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400"
+                          : p.status === "pending"
+                            ? "whitespace-nowrap text-sm font-semibold tabular-nums text-amber-600 dark:text-amber-400"
+                            : "whitespace-nowrap text-sm font-semibold tabular-nums text-gray-400 line-through dark:text-gray-500"
+                      }
+                    >
                       {formatEur(p.amount)}
                     </span>
                   </li>

@@ -401,6 +401,23 @@ export async function saveDebtPaymentAction(input: {
   return done();
 }
 
+// Mama potrdi ali zavrne odplačilo dolga (RPC preveri vlogo in stanje).
+export async function confirmDebtPaymentAction(id: string): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  const { error } = await c.supabase.rpc("kvit_confirm_debt_payment", { p_id: id });
+  if (error) return fail(error.message, "Potrditev ni uspela.");
+  return done();
+}
+
+export async function rejectDebtPaymentAction(id: string): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  const { error } = await c.supabase.rpc("kvit_reject_debt_payment", { p_id: id });
+  if (error) return fail(error.message, "Zavrnitev ni uspela.");
+  return done();
+}
+
 export async function deleteDebtPaymentAction(id: string): Promise<KvitResult> {
   const c = await ctx();
   if (c.error !== undefined) return { error: c.error };

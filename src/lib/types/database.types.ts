@@ -73,6 +73,10 @@ export type KvitDebtPayment = {
   amount: number;
   day: string; // "YYYY-MM-DD"
   note: string;
+  // 0014: z mamo v gospodinjstvu čaka na njeno potrditev; šteje samo confirmed.
+  // Stanje določa sprožilec v bazi (odjemalec ga ne more nastaviti).
+  status: "pending" | "confirmed" | "rejected";
+  resolved_at: string | null;
   created_by: string | null;
   created_at: string;
 };
@@ -192,6 +196,8 @@ export type Database = {
       };
       kvit_confirm_month: { Args: { p_month_id: string }; Returns: undefined };
       kvit_reject_month: { Args: { p_month_id: string }; Returns: undefined };
+      kvit_confirm_debt_payment: { Args: { p_id: string }; Returns: undefined };
+      kvit_reject_debt_payment: { Args: { p_id: string }; Returns: undefined };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import MamaPreviewToggle from "@/components/kvit/MamaPreviewToggle";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { getMembership } from "@/lib/data/kvit";
 import SsoHashCleanup from "@/components/auth/SsoHashCleanup";
@@ -57,6 +59,13 @@ export default async function AppLayout({
               <IconHistory className="h-5 w-5" />
               <span className="hidden sm:inline">Zgodovina</span>
             </Link>
+            {/* ZA TESTIRANJE: predogled mamine domače strani (sin vidi, kar vidi mama). */}
+            {membership.member.role !== "mama" && (
+              // Suspense: useSearchParams v client komponenti
+              <Suspense fallback={null}>
+                <MamaPreviewToggle className={ICON_BTN} />
+              </Suspense>
+            )}
             <Link href="/nastavitve" aria-label="Nastavitve" className={ICON_BTN}>
               <IconSettings className="h-5 w-5" />
             </Link>

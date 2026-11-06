@@ -91,9 +91,10 @@ export async function getLedgers(supabase: Supa, untilKey: string): Promise<Memb
 }
 
 export type DebtWithPayments = KvitDebt & {
-  payments: KvitDebtPayment[]; // najnovejša zgoraj
-  paid: number;
-  remaining: number;
+  payments: KvitDebtPayment[]; // najnovejša zgoraj (vsa stanja)
+  paid: number; // samo potrjena odplačila
+  pending: number; // vsota odplačil, ki čakajo na mamino potrditev
+  remaining: number; // amount − paid
 };
 
 // Dolgovi vseh članov gospodinjstva s plačili (RLS omeji na gospodinjstvo).
@@ -109,8 +110,16 @@ export async function getDebts(supabase: Supa): Promise<DebtWithPayments[]> {
   return (debts ?? []).map((raw) => {
     const debt = num(raw);
     const own = (payments ?? []).filter((p) => p.debt_id === debt.id).map(num);
-    const paid = Math.round(own.reduce((a, p) => a + p.amount, 0) * 100) / 100;
-    return { ...debt, payments: own, paid, remaining: Math.round((debt.amount - paid) * 100) / 100 };
+    const sum = (status: KvitDebtPayment["status"]) =>
+      Math.round(own.filter((p) => p.status === status).reduce((a, p) => a + p.amount, 0) * 100) / 100;
+    const paid = sum("confirmed");
+    return {
+      ...debt,
+      payments: own,
+      paid,
+      pending: sum("pending"),
+      remaining: Math.round((debt.amount - paid) * 100) / 100,
+    };
   });
 }
 
