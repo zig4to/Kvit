@@ -18,8 +18,12 @@ export default async function DebtPage({
     getDebts(supabase),
   ]);
   if (!(members ?? []).some((m) => m.user_id === user.id)) return null; // layout pokaže Onboarding
-  // Dolg imajo samo sinovi; mama vidi oba (samo branje), privzeto prvega.
-  const all = (members ?? []).filter((m) => m.role !== "mama");
+  // Dolg imajo samo sinovi. Sin vidi samo svojega; mama vidi oba (samo branje),
+  // privzeto prvega.
+  const isMama = (members ?? []).some((m) => m.user_id === user.id && m.role === "mama");
+  const all = (members ?? []).filter(
+    (m) => m.role !== "mama" && (isMama || m.user_id === user.id),
+  );
   if (all.length === 0) return null;
 
   const personId = all.some((m) => m.user_id === params.oseba)
