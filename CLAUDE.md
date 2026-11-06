@@ -188,7 +188,9 @@ ali zavrne (`kvit_reject_month`).
 
 ### `/dolg` — Skupni dolg (`DebtView`)
 
-`?oseba=`, mama je izključena iz seznama oseb (privzeto prvi sin). Kartica na
+Sin vidi samo svoj dolg (brez zavihkov oseb, `?oseba=` tujega sina se
+prezre). Mama vidi oba sinova (`?oseba=`, privzeto prvi sin, samo branje),
+sama je izključena iz seznama. Kartica na
 dolg (preostanek = `amount − Σ odplačil`, napredek, odplačila), „+ Odplačilo“
 (znesek, datum, opomba), svinčnik za urejanje/brisanje, „Vpiši dolg“
 (privzeto ime „Skupni dolg“). Z mesečnim obračunom ni povezan.
@@ -212,7 +214,7 @@ Glava avta: slika (`0005`, kamera → `uploadCarPhoto` 1400 px →
 VW, Berlingo → Citroën, Megane → Renault). `CarPhoto` 128×80,
 `object-contain object-bottom`, `transform: translateY(offset%) scale(zoom)`
 z izhodiščem `50% 35%`; drsnika „Povečava slike“ in „Položaj slike“ v „Uredi
-avto“. Trenutno: Passat zoom 1,35; Megane zoom 1,15, offset −6.
+avto“. Trenutno: Passat zoom 1,35; Megane zoom 1,15, offset −10.
 
 ### Ostalo
 
