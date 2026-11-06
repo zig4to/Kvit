@@ -224,13 +224,13 @@ avto“. Trenutno: Passat zoom 1,35; Megane zoom 1,15, offset −6.
 
 ## Stanje podatkov (2026-11-06)
 
-- V gospodinjstvu je zaenkrat samo **Žiga** („Žiga Tomše“). Nejc in mama se
-  še nista pridružila.
+- Gospodinjstvo „Bitne“: **Žiga** („Žiga Tomše“, sin), **Nejc** („Nejc
+  Tomše“, sin) in **Mama** („Mama“, vloga `mama`). Nejc in mama sta bila
+  vpisana prek SQL 2026-11-06.
 - Meseci do vključno oktobra 2026 so poravnani izven aplikacije; **november
   2026 je prvi mesec** in začne s 350 € (brez prenosa). Prazne vrstice za
   september/oktober so bile izbrisane.
-- Dolg Žiga: 6.941 € („Skupni dolg“). **Dolg Nejc 8.172 € še ni vpisan** —
-  vpiše ga Nejc (ali Claude prek SQL), ko se pridruži.
+- Skupni dolg: Žiga 6.941 €, Nejc 8.172 € (oba „Skupni dolg“, brez odplačil).
 - Avti uvoženi iz Excela. Servisna vrstica Megane v Excelu je enaka kot pri
   Passatu (isti datum in km) — uvožena kot je.
 - Odprt skupni strošek: Zimske Gume, Berlingo, 365 €, plačal Nejc → Žiga
