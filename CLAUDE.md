@@ -74,6 +74,8 @@ v številke.
 | `0009_mama` | `kvit_members.role` `sin`/`mama`; `kvit_months.settle_requested_at`, `settle_amount`; `kvit_join_household(p_code, p_display_name, p_role default 'sin')`; RPC `kvit_confirm_month`, `kvit_reject_month` (prek `kvit_mama_month`, preverita vlogo mama) |
 | `0010_lock_member_role` | sprožilec: vloge po pridružitvi ni mogoče spremeniti (sicer bi si sin dal vlogo mama in sam potrdil poravnavo) |
 | `0011_receipts` | `kvit_entries.receipt_path`, zasebni bucket `kvit-racuni` |
+| `0012_shared_expenses` | `kvit_shared_expenses` (`label`, `amount` = cel nakup, `paid_by`, `owed_by` = imena, `share` = koliko dolguje, `day`, `settled`); več dolžnikov = ena vrstica na dolžnika; RLS `for all` prek gospodinjstva |
+| `0013_remove_redni_servis_deadline` | izbriše prazne roke „Redni servis“ (servisi so v razdelku Redni servisi) |
 
 **RLS:** `kvit_my_household()` (security definer). Vsi člani berejo vse v
 gospodinjstvu. Meseci, vnosi in dolgovi: **piše samo lastnik**
@@ -90,7 +92,7 @@ neposredno — potrjuje prek security definer RPC.
 
 **Realtime:** `kvit_entries`, `kvit_months`, `kvit_debts`,
 `kvit_debt_payments`, `kvit_cars`, `kvit_car_records`, `kvit_car_deadlines`,
-`kvit_car_specs`, `kvit_car_settlements`. Komponente ob spremembi pokličejo
+`kvit_car_specs`, `kvit_car_settlements`, `kvit_shared_expenses`. Komponente ob spremembi pokličejo
 `router.refresh()` (z zamikom 300 ms).
 
 ## Izračun
@@ -113,7 +115,11 @@ starim zneskom, da se zgodovina ne spremeni. Prazen mesec pred prvim zapisanim
 `src/lib/kvit/cars.ts` (prav tako brez importov): `splitNet(records, owners)`
 — neporavnan vnos s ceno: plačnik +cena, vsak lastnik −cena/n (en lastnik =
 nič deljenja); `addNets`; `settlements(net)` (dolžniki → upniki, požrešno);
-`dative` (Žiga → Žigi, Nejc → Nejcu, Mama → Mami).
+`recordDebts(record, owners)` (vsak lastnik razen plačnika dolguje plačniku
+cena/n); `pairDebts(debts)` — neto **po parih**, brez preusmerjanja prek
+tretjega (to uporablja `getCarBalance`; sicer bi „Mama dolguje Žigi, Žiga
+Nejcu“ postalo „Mama dolguje Nejcu“); `dative` (Žiga → Žigi, Nejc → Nejcu,
+Mama → Mami).
 
 **Imena:** `paid_by`, `owners`, `from_name`/`to_name` so imena, ne id-ji. Ime
 člana = prva beseda `display_name` (`firstName()` v `src/lib/data/kvit.ts`,
@@ -140,12 +146,22 @@ Uporabnik brez gospodinjstva vidi `Onboarding`.
 Sin vidi svoje kartice (`Card`; cela kartica je povezava, razen
 `whole={false}`, kjer je povezava samo glava, ker so v vsebini gumbi):
 1. **Aktualno** → `CarBalance` (skupni stroški avtov iz mojega pogleda:
-   rdeče „Nejcu dolguješ X €“ / zeleno „Žiga ti dolguje X €“, pod tem seznam
-   razlogov „Zimske Gume · Berlingo · plačal Nejc 365 € (pol 182,50 €)“).
+   rdeče „Nejcu dolguješ X €“ / zeleno „Žiga ti dolguje X €“ z rožnato
+   puščico desno; pod črto, privzeto zloženo (`<details>`, `collapsible`),
+   seznam razlogov „Zimske Gume · Berlingo · plačal Nejc 365 € (pol
+   182,50 €)“ in gumb Poravnaj). Enako na vrhu `/avti`. Samo na domači
+   strani (`names` prop, imena članov, mama na koncu) gumb **Dodaj
+   strošek** → `ExpenseDialog`: kaj, znesek, Kdo je plačal, Kdo dolguje
+   (lahko več), Koliko dolguje: Pol/Enako (znesek / (dolžniki + 1)), Cel
+   znesek (/ dolžniki), Znesek (vsak). Klik na strošek v razlogih ga uredi
+   ali izbriše (urejanje: en dolžnik).
 2. **Lajf** — stanje tekočega meseca (Za doplačilo / Dobropis / Kvit,
    razčlenitev) → `/lajf`.
 3. **Skupni dolg** — preostanek, odplačano, vrstica napredka, zadnje
-   odplačilo → `/dolg`.
+   odplačilo → `/dolg`. Zneski so **zamegljeni**, dokler ne klikneš nanje
+   (`Reveal`, `blur-sm`, klik ne sproži povezave; ob vsakem nalaganju spet
+   skriti). Enako na `/dolg` (`DebtView`: cela kartica dolga je `Reveal`,
+   gumba svinčnik in Odplačilo kličeta `stopPropagation`; „Skupaj še“).
 
 Mama vidi `MamaDashboard`: **Aktualno** (prošnje „Nejc pravi, da ti je plačal
 270 € za stroške novembra“ → Potrdi / Zavrni), **Ta mesec** (stanje obeh
@@ -154,9 +170,12 @@ obeh sinov s skupno vsoto.
 
 ### Poravnava skupnih stroškov avtov (`CarBalance`, `0008`)
 
-`getCarBalance(supabase, myName)` vrne `owed` (brez vnosov v čakajočih
-poravnavah), `reasons`, `pending`. Dolžnik klikne „Poravnaj“ →
-`settleCarsAction` zapiše `pending` vrstico z `record_ids`; dolžnik vidi
+`getCarBalance(supabase, myName)` vrne `owed` (po parih, brez vnosov v
+čakajočih poravnavah), `reasons` (vnosi avtov in skupni stroški `0012`, vsak
+z `debts`), `pending`. `record_ids` vsebuje id-je iz obeh tabel;
+`markSettled` označi obe. Dolžnik klikne „Poravnaj“ →
+`settleCarsAction` zapiše `pending` vrstico na upnika, samo z vnosi tega para
+(dolgov drugih do dolžnika se ne dotakne); dolžnik vidi
 rumeno „Plačal si Nejcu … — čaka na potrditev“ (Prekliči), upnik zeleno
 „Žiga pravi, da ti je plačal …“ (Potrdi / Zavrni). `confirmCarSettlementAction`
 (samo `to_name`) označi te vnose `settled`. Če „Poravnaj“ klikne upnik, se
@@ -202,12 +221,13 @@ dolg (preostanek = `amount − Σ odplačil`, napredek, odplačila), „+ Odpla�
 podpisane povezave do slik in slika ob menjavi poskoči; slike ostalih avtov
 se naložijo vnaprej (skrit `<img>`), `CarPhoto` ima `key={car.id}`.
 
-Na avto (razdelki zložljivi, `Section`, stanje v piškotku
-`kvit-avti-zlozeno`, bere ga strežnik — brez utripa): **Pregledi in roki**
+Na avto (razdelki zložljivi, `Section`, **privzeto zaprti**; odprti so v piškotku
+`kvit-avti-odprto`, bere ga strežnik — brez utripa): **Pregledi in roki**
 (poteklo / še N dni ≤ 30 / velja), **Redni servisi** (naslednji servis v km),
-**Vzdrževanje in popravila** („+ Dodaj“), **Podatki o vozilu**. Servis in
+**Vzdrževanje in popravila** („+ Dodaj“), **Podatki o vozilu**, **Stroški po letih** (vsota cen po letu, ločeno
+servisi/popravila). Servis in
 popravilo imata Plačal (Žiga / Nejc / Mama) in Poravnano. Nov avto
-(`saveCarAction`) dobi 5 privzetih rokov in „Velikost gum“.
+(`saveCarAction`) dobi 4 privzete roke (tehnični, registracija, zavarovanje, vinjeta) in „Velikost gum“.
 
 Glava avta: slika (`0005`, kamera → `uploadCarPhoto` 1400 px →
 `setCarPhotoAction`) ali logotip znamke (`CarLogo`, SVG, po imenu: Passat →
