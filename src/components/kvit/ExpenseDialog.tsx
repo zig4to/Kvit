@@ -17,6 +17,8 @@ import type { KvitSharedExpense } from "@/lib/types/database.types";
 type Split = "enako" | "cel" | "znesek";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+// Slovenska dvojina: 2 osebi, 3 osebe, 5 oseb.
+const people = (n: number) => (n % 100 === 2 ? "osebi" : n % 100 === 3 || n % 100 === 4 ? "osebe" : "oseb");
 
 // Skupni strošek: kaj je kupljeno, kdo je plačal, kdo dolguje (eden ali več)
 // in koliko. Prišteje se v Aktualno; vsak dolžnik dobi svojo vrstico.
@@ -66,10 +68,12 @@ function ExpenseForm({
   const [amount, setAmount] = useState(expense ? amountInput(expense.amount) : "");
   const [paidBy, setPaidBy] = useState(expense?.paid_by ?? myName);
   const [owedBy, setOwedBy] = useState<string[]>(expense ? [expense.owed_by] : defaultDebtors(myName));
+  // Še oseb izven Kvita (npr. prijatelja), ki si delita strošek pri „Enako“.
+  const [extra, setExtra] = useState(expense?.extra_people ?? 0);
   const [split, setSplit] = useState<Split>(() => {
     if (!expense) return "enako";
     if (expense.share === expense.amount) return "cel";
-    if (Math.abs(expense.share - expense.amount / 2) < 0.006) return "enako";
+    if (Math.abs(expense.share - expense.amount / (2 + expense.extra_people)) < 0.006) return "enako";
     return "znesek";
   });
   const [custom, setCustom] = useState(expense ? amountInput(expense.share) : "");
@@ -87,11 +91,11 @@ function ExpenseForm({
         ? null
         : split === "cel"
           ? round2(validTotal / n)
-          : round2(validTotal / (n + 1));
+          : round2(validTotal / (n + 1 + extra));
   const validShare = share !== null && !Number.isNaN(share) && share > 0 ? share : null;
 
   const splits: { id: Split; label: string }[] = [
-    { id: "enako", label: n > 1 ? "Enako" : "Pol" },
+    { id: "enako", label: n > 1 || extra > 0 ? "Enako" : "Pol" },
     { id: "cel", label: "Cel znesek" },
     { id: "znesek", label: n > 1 ? "Znesek vsak" : "Znesek" },
   ];
@@ -117,7 +121,16 @@ function ExpenseForm({
       return setError(n > 1 ? "Deleži skupaj ne morejo biti večji od zneska." : "Delež ne more biti večji od zneska.");
     }
     run(() =>
-      saveSharedExpenseAction({ id: expense?.id, label, amount: validTotal, paidBy, owedBy, share: validShare, day })
+      saveSharedExpenseAction({
+        id: expense?.id,
+        label,
+        amount: validTotal,
+        paidBy,
+        owedBy,
+        share: validShare,
+        extraPeople: split === "enako" ? extra : 0,
+        day,
+      })
     );
   };
 
@@ -177,6 +190,40 @@ function ExpenseForm({
       <div>
         <p className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Koliko dolguje</p>
         <Segmented value={split} options={splits} onChange={setSplit} />
+        {split === "enako" && (
+          <div className="mt-2 flex items-center justify-between gap-2 text-sm">
+            <span className="text-gray-600 dark:text-gray-400">
+              Še oseb izven Kvita
+              {validTotal !== null && n > 0 && (
+                <span className="text-gray-400 dark:text-gray-500">
+                  {" "}
+                  · {n + 1 + extra} {people(n + 1 + extra)} skupaj
+                </span>
+              )}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Ena oseba manj"
+                disabled={extra === 0}
+                onClick={() => setExtra(Math.max(0, extra - 1))}
+                className="h-8 w-8 rounded-md bg-gray-100 font-semibold disabled:opacity-40 dark:bg-gray-800"
+              >
+                −
+              </button>
+              <span className="w-6 text-center font-semibold tabular-nums">{extra}</span>
+              <button
+                type="button"
+                aria-label="Ena oseba več"
+                disabled={extra >= 50}
+                onClick={() => setExtra(Math.min(50, extra + 1))}
+                className="h-8 w-8 rounded-md bg-gray-100 font-semibold disabled:opacity-40 dark:bg-gray-800"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        )}
         {split === "znesek" && (
           <Input
             aria-label={n > 1 ? "Koliko dolguje vsak (€)" : "Koliko dolguje (€)"}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import clsx from "@/lib/utils/clsx";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { firstName, getCarBalance, getDebts, getLedgers, getMembership } from "@/lib/data/kvit";
+import { canPreviewMama, firstName, getCarBalance, getDebts, getLedgers, getMembership } from "@/lib/data/kvit";
 import MamaDashboard from "@/components/kvit/MamaDashboard";
 import CarBalance from "@/components/kvit/CarBalance";
 import Reveal from "@/components/kvit/Reveal";
@@ -32,7 +32,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   // Mama: nadzorna plošča (ledgers so samo sinovi).
   const isMama = membership?.member.role === "mama";
-  if (isMama || params.pogled === "mama") {
+  const preview = params.pogled === "mama" && !!membership && canPreviewMama(membership.member);
+  if (isMama || preview) {
     const name = (l: (typeof ledgers)[number]) => l.member.display_name || "Brez imena";
     return (
       <MamaDashboard

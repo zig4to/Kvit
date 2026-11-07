@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import MamaPreviewToggle from "@/components/kvit/MamaPreviewToggle";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { getMembership } from "@/lib/data/kvit";
+import { canPreviewMama, getMembership } from "@/lib/data/kvit";
 import SsoHashCleanup from "@/components/auth/SsoHashCleanup";
 import Onboarding from "@/components/kvit/Onboarding";
 import { IconBasket, IconCar, IconHandCoins, IconHome, IconHandshake, IconHistory, IconSettings } from "@/components/ui/icons";
@@ -60,7 +60,7 @@ export default async function AppLayout({
               <span className="hidden sm:inline">Zgodovina</span>
             </Link>
             {/* ZA TESTIRANJE: predogled mamine domače strani (sin vidi, kar vidi mama). */}
-            {membership.member.role !== "mama" && (
+            {canPreviewMama(membership.member) && (
               // Suspense: useSearchParams v client komponenti
               <Suspense fallback={null}>
                 <MamaPreviewToggle className={ICON_BTN} />

@@ -77,6 +77,7 @@ v številke.
 | `0012_shared_expenses` | `kvit_shared_expenses` (`label`, `amount` = cel nakup, `paid_by`, `owed_by` = imena, `share` = koliko dolguje, `day`, `settled`); več dolžnikov = ena vrstica na dolžnika; RLS `for all` prek gospodinjstva |
 | `0013_remove_redni_servis_deadline` | izbriše prazne roke „Redni servis“ (servisi so v razdelku Redni servisi) |
 | `0014_debt_payment_approval` | `kvit_debt_payments.status` `pending`/`confirmed`/`rejected` (obstoječa `confirmed`), `resolved_at`; sprožilec `kvit_debt_payments_status` (z mamo v gospodinjstvu: nov vnos ali sprememba zneska/datuma → `pending`, sin stanja ne more spremeniti; brez mame → `confirmed`); RPC `kvit_confirm_debt_payment` / `kvit_reject_debt_payment` (samo mama) |
+| `0015_shared_expense_extra_people` | `kvit_shared_expenses.extra_people` 0–50 — še oseb izven Kvita pri delitvi „Enako“ (samo za prikaz in urejanje; `share` je že izračunan) |
 
 **RLS:** `kvit_my_household()` (security definer). Vsi člani berejo vse v
 gospodinjstvu. Meseci, vnosi in dolgovi: **piše samo lastnik**
@@ -150,10 +151,13 @@ Sin vidi svoje kartice (`Card`; cela kartica je povezava, razen
    rdeče „Nejcu dolguješ X €“ / zeleno „Žiga ti dolguje X €“ z rožnato
    puščico desno; pod črto, privzeto zloženo (`<details>`, `collapsible`),
    seznam razlogov „Zimske Gume · Berlingo · plačal Nejc 365 € (pol
-   182,50 €)“ in gumb Poravnaj). Enako na vrhu `/avti`. Samo na domači
+   182,50 €)“ in gumb Poravnaj). Čisto desno stolpec **Račun**: prispevek
+   vnosa k mojemu stanju (+ dolgujem, − meni dolgujejo), spodaj dvojna črta
+   in vsota „Skupaj“. Enako na vrhu `/avti`. Samo na domači
    strani (`names` prop, imena članov, mama na koncu) gumb **Dodaj
    strošek** → `ExpenseDialog`: kaj, znesek, Kdo je plačal, Kdo dolguje
-   (lahko več), Koliko dolguje: Pol/Enako (znesek / (dolžniki + 1)), Cel
+   (lahko več), Koliko dolguje: Pol/Enako (znesek / (dolžniki + 1 + še oseb
+   izven Kvita), števec − N + pod gumbi, v razlogih „+N izven Kvita“), Cel
    znesek (/ dolžniki), Znesek (vsak). Klik na strošek v razlogih ga uredi
    ali izbriše (urejanje: en dolžnik).
 2. **Lajf** — stanje tekočega meseca (Za doplačilo / Dobropis / Kvit,
@@ -170,8 +174,9 @@ Mama vidi `MamaDashboard`: **Aktualno** (prošnje „Nejc pravi, da ti je plača
 sinov: Plačano / Čaka na tvojo potrditev / Še ni plačal · X €), **Skupni dolg**
 obeh sinov s skupno vsoto.
 
-**Začasno, za testiranje:** gumb **Mati** (oko) v zgornji vrstici (samo sin)
-→ `/?pogled=mama` pokaže sinu `MamaDashboard`; v predogledu je gumb obarvan
+**Začasno, za testiranje:** gumb **Mati** (oko) v zgornji vrstici (samo Žiga,
+`canPreviewMama` v `src/lib/data/kvit.ts`; Nejcu se `?pogled=mama` prezre)
+→ `/?pogled=mama` pokaže `MamaDashboard`; v predogledu je gumb obarvan
 („Predogled: mama“ ×, `MamaPreviewToggle`, klik → `/`).
 Potrditve še vedno preveri strežnik (RPC dovoli samo vlogi mama). Ko ni več
 potreben, odstrani `MamaPreviewToggle` iz `layout.tsx` in `pogled` v `page.tsx`.

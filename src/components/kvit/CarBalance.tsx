@@ -256,6 +256,8 @@ function Details({ count, children }: { count: number; children: React.ReactNode
 }
 
 // Klik na skupni strošek (z onEdit) ga odpre za urejanje; vnosi avtov se urejajo na /avti.
+// Desno stolpec „Račun“: koliko vnos prispeva k mojemu stanju (+ dolgujem,
+// − meni dolgujejo), spodaj dvojna črta in vsota.
 function ReasonList({
   reasons,
   myName,
@@ -268,41 +270,69 @@ function ReasonList({
   onEdit?: (e: KvitSharedExpense) => void;
 }) {
   const me = (n: string) => (n === myName ? "ti" : n);
+  const mine = (x: CarReason) =>
+    round2(x.debts.reduce((a, d) => a + (d.from === myName ? d.amount : d.to === myName ? -d.amount : 0), 0));
+  const sum = round2(reasons.reduce((a, x) => a + mine(x), 0));
+  const col = "w-20 flex-shrink-0 text-right tabular-nums";
   return (
-    <ul className={`space-y-0.5 text-sm text-gray-600 dark:text-gray-400 ${className}`}>
-      {reasons.map((x) => {
-        const body = (
-          <>
-            <span className="min-w-0">
-              {x.text}
-              {x.car && ` · ${x.car}`}
-              <span className="text-gray-400 dark:text-gray-500"> · plačal {me(x.paidBy)}</span>
-            </span>
-            <span className="flex-shrink-0 tabular-nums">
-              {formatEur(x.price)}{" "}
-              <span className="text-gray-400 dark:text-gray-500">
-                ({x.owedBy ? `${me(x.owedBy)} ${formatEur(x.share)}` : `pol ${formatEur(x.share)}`})
+    <div className={`text-sm text-gray-600 dark:text-gray-400 ${className}`}>
+      <div className="flex justify-end text-xs font-medium text-gray-400 dark:text-gray-500">
+        <span className={col}>Račun</span>
+      </div>
+      <ul className="space-y-0.5">
+        {reasons.map((x) => {
+          const body = (
+            <>
+              <span className="min-w-0 flex-1">
+                {x.text}
+                {x.car && ` · ${x.car}`}
+                {!!x.expense?.extra_people && (
+                  <span className="text-gray-400 dark:text-gray-500"> · +{x.expense.extra_people} izven Kvita</span>
+                )}
+                <span className="text-gray-400 dark:text-gray-500"> · plačal {me(x.paidBy)}</span>
               </span>
-            </span>
-          </>
-        );
-        const exp = x.expense;
-        return (
-          <li key={x.id}>
-            {exp && onEdit ? (
-              <button
-                type="button"
-                onClick={() => onEdit(exp)}
-                className="-mx-1 flex w-[calc(100%+0.5rem)] justify-between gap-2 rounded px-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                {body}
-              </button>
-            ) : (
-              <div className="flex justify-between gap-2">{body}</div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+              <span className="flex-shrink-0 tabular-nums">
+                {formatEur(x.price)}{" "}
+                <span className="text-gray-400 dark:text-gray-500">
+                  ({x.owedBy ? `${me(x.owedBy)} ${formatEur(x.share)}` : `pol ${formatEur(x.share)}`})
+                </span>
+              </span>
+              <span className={`${col} font-medium text-gray-800 dark:text-gray-200`}>{signed(mine(x))}</span>
+            </>
+          );
+          const exp = x.expense;
+          return (
+            <li key={x.id}>
+              {exp && onEdit ? (
+                <button
+                  type="button"
+                  onClick={() => onEdit(exp)}
+                  className="-mx-1 flex w-[calc(100%+0.5rem)] gap-2 rounded px-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  {body}
+                </button>
+              ) : (
+                <div className="flex gap-2">{body}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-1 flex justify-end gap-2">
+        <span className="text-gray-400 dark:text-gray-500">Skupaj</span>
+        <span
+          className={`${col} border-t-[3px] border-double border-gray-400 pt-0.5 font-bold dark:border-gray-500 ${
+            sum > 0 ? "text-rose-600 dark:text-rose-400" : sum < 0 ? "text-emerald-600 dark:text-emerald-400" : ""
+          }`}
+        >
+          {signed(sum)}
+        </span>
+      </div>
+    </div>
   );
 }
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const NUM = new Intl.NumberFormat("sl-SI", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// 182,50 / −15,00 (brez €, da je stolpec ozek)
+const signed = (n: number) => (n < 0 ? `−${NUM.format(-n)}` : NUM.format(n));

@@ -559,6 +559,7 @@ export type SharedExpenseInput = {
   paidBy: string;
   owedBy: string[]; // več dolžnikov → ena vrstica na dolžnika (urejanje: točno en)
   share: number; // koliko dolguje vsak
+  extraPeople?: number; // še oseb izven Kvita (samo za prikaz/urejanje)
   day: string;
 };
 
@@ -582,7 +583,16 @@ export async function saveSharedExpenseAction(input: SharedExpenseInput): Promis
   const names = new Set((members ?? []).map((m) => firstName(m.display_name)));
   if (![input.paidBy, ...debtors].every((n) => names.has(n))) return { error: "Izberi člana gospodinjstva." };
   if (debtors.includes(input.paidBy)) return { error: "Plačnik ne more biti tudi dolžnik." };
-  const rows = debtors.map((owed_by) => ({ label, amount, share, paid_by: input.paidBy, owed_by, day: input.day }));
+  const extra_people = Math.min(50, Math.max(0, Math.round(input.extraPeople ?? 0)));
+  const rows = debtors.map((owed_by) => ({
+    label,
+    amount,
+    share,
+    extra_people,
+    paid_by: input.paidBy,
+    owed_by,
+    day: input.day,
+  }));
   const { error } = input.id
     ? await c.supabase.from("kvit_shared_expenses").update(rows[0]).eq("id", input.id).eq("settled", false)
     : await c.supabase.from("kvit_shared_expenses").insert(rows);

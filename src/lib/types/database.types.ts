@@ -156,6 +156,7 @@ export type KvitSharedExpense = {
   paid_by: string; // ime plačnika
   owed_by: string; // ime dolžnika
   share: number; // koliko dolguje owed_by
+  extra_people: number; // 0015: še oseb izven Kvita pri delitvi „Enako“
   day: string;
   settled: boolean;
   created_by: string | null;

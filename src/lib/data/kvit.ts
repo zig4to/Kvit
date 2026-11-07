@@ -181,6 +181,9 @@ export function labelSuggestions(ledgers: MemberLedger[]) {
 // „Plačal“ in lastniki avtov so imena — prva beseda display_name (Žiga Tomše → Žiga).
 export const firstName = (displayName: string) => displayName.trim().split(/\s+/)[0] ?? "";
 
+// ZA TESTIRANJE: predogled mamine domače strani (gumb Mati, ?pogled=mama) samo za Žigo.
+export const canPreviewMama = (m: KvitMember) => m.role !== "mama" && firstName(m.display_name) === "Žiga";
+
 export type CarReason = {
   id: string;
   text: string;
