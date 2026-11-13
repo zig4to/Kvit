@@ -21,7 +21,7 @@ stara Excela „ŽIGA / NEJC“ in „Avto Stroški in Servisi“). Uporabniki: 
 
 Vsak član vidi vse v gospodinjstvu, ureja pa samo svoje (mesece, dolgove).
 
-Ogrodje je kopija aplikacije **Cekar** (prijava, SSO iz huba TomsStudios, tema,
+Ogrodje je kopija aplikacije **Cekar** (prijava, SSO iz huba Bitneverse, tema,
 PWA/service worker, UI primitivi, gospodinjstvo s kodo za povabilo). Uporablja
 isti Supabase projekt kot Pisi/Posel/Vzlet/Cekar, tabele imajo predpono `kvit_`.
 
@@ -47,9 +47,9 @@ npm run build
 - GitHub `https://github.com/zig4to/Kvit.git` (veja `main`), Vercel
   **https://kvit-pearl.vercel.app/** (regija dub1, `vercel.json`), deploy ob
   pushu na `main`.
-- Registrirano v zbirki: TomsStudios `apps-registry.js` (id `kvit`, podnaslov
+- Registrirano v zbirki: Bitneverse `apps-registry.js` (id `kvit`, podnaslov
   „Obračun mesečnih stroškov“), Iskra `script.js` `APPS`, zaganjalnik
-  `apps.json` (port 3007). Ob spremembi kartice v TomsStudios povečaj
+  `apps.json` (port 3007). Ob spremembi kartice v Bitneverse povečaj
   `VERZIJA` v njegovem `sw.js`.
 
 ## Baza (Supabase)
