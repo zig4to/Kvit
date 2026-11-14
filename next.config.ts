@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   // gumbi/kliki ne delujejo. Dovolimo lokalno omrežje za `npm run dev`.
   allowedDevOrigins: ["**.trycloudflare.com", "192.168.*.*", "10.*.*.*", "**.ts.net"],
 
+  // Server Actions prek tunela: origin (tunel) se ne ujema z x-forwarded-host (localhost).
+  experimental: {
+    serverActions: { allowedOrigins: ["*.trycloudflare.com", "*.ts.net"] },
+  },
+
   // Skrij Next.js značko/indikator v spodnjem levem kotu med razvojem.
   // Napake pri prevajanju/izvajanju se še vedno prikažejo.
   devIndicators: false,

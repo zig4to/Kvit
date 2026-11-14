@@ -281,39 +281,36 @@ function ReasonList({
       </div>
       <ul className="space-y-0.5">
         {reasons.map((x) => {
-          const body = (
-            <>
-              <span className="min-w-0 flex-1">
-                {x.text}
-                {x.car && ` · ${x.car}`}
-                {!!x.expense?.extra_people && (
-                  <span className="text-gray-400 dark:text-gray-500"> · +{x.expense.extra_people} izven Kvita</span>
-                )}
-                <span className="text-gray-400 dark:text-gray-500"> · plačal {me(x.paidBy)}</span>
-              </span>
-              <span className="flex-shrink-0 tabular-nums">
-                {formatEur(x.price)}{" "}
-                <span className="text-gray-400 dark:text-gray-500">
-                  ({x.owedBy ? `${me(x.owedBy)} ${formatEur(x.share)}` : `pol ${formatEur(x.share)}`})
-                </span>
-              </span>
-              <span className={`${col} font-medium text-gray-800 dark:text-gray-200`}>{signed(mine(x))}</span>
-            </>
-          );
           const exp = x.expense;
           return (
             <li key={x.id}>
-              {exp && onEdit ? (
-                <button
-                  type="button"
-                  onClick={() => onEdit(exp)}
-                  className="-mx-1 flex w-[calc(100%+0.5rem)] gap-2 rounded px-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  {body}
-                </button>
-              ) : (
-                <div className="flex gap-2">{body}</div>
-              )}
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+                  <IconChevronDown className="h-4 w-4 flex-shrink-0 -rotate-90 transition-transform group-open:rotate-0" />
+                  <span className="min-w-0 flex-1 truncate">{x.text}</span>
+                  <span className="flex-shrink-0 tabular-nums">{formatEur(x.price)}</span>
+                  <span className={`${col} font-medium text-gray-800 dark:text-gray-200`}>{signed(mine(x))}</span>
+                </summary>
+                <div className="mb-1 ml-5 text-xs text-gray-500 dark:text-gray-400">
+                  <p>
+                    {x.car && `${x.car} · `}
+                    plačal {me(x.paidBy)}
+                    {!!exp?.extra_people && ` · +${exp.extra_people} izven Kvita`}
+                  </p>
+                  <p>
+                    Delež: {x.owedBy ? `${me(x.owedBy)} ${formatEur(x.share)}` : `pol ${formatEur(x.share)}`}
+                  </p>
+                  {exp && onEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(exp)}
+                      className="mt-0.5 font-medium text-rose-600 hover:underline dark:text-rose-400"
+                    >
+                      Uredi
+                    </button>
+                  )}
+                </div>
+              </details>
             </li>
           );
         })}
