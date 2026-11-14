@@ -1,12 +1,10 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import MamaPreviewToggle from "@/components/kvit/MamaPreviewToggle";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { canPreviewMama, getMembership } from "@/lib/data/kvit";
+import { getMembership } from "@/lib/data/kvit";
 import SsoHashCleanup from "@/components/auth/SsoHashCleanup";
 import Onboarding from "@/components/kvit/Onboarding";
-import { IconBasket, IconCar, IconHandCoins, IconHome, IconHandshake, IconHistory, IconSettings } from "@/components/ui/icons";
+import { IconBasket, IconCar, IconHandCoins, IconHome, IconHandshake, IconSettings } from "@/components/ui/icons";
 
 const TABS = [
   { href: "/", label: "Domov", Icon: IconHome },
@@ -21,7 +19,7 @@ const HOVER =
 const TAB = `flex w-12 flex-col items-center gap-1 px-1 py-1.5 font-medium sm:w-auto sm:flex-row sm:gap-1.5 sm:p-2 ${HOVER}`;
 const ICON_BTN = `flex items-center gap-1.5 p-2 text-sm font-medium ${HOVER}`;
 
-// Ogrodje aplikacije Kvit: zgornja vrstica (logo → domov, domov, lajf, dolg, avti, zgodovina, nastavitve), pod
+// Ogrodje aplikacije Kvit: zgornja vrstica (logo → domov, domov, lajf, dolg, avti, nastavitve — zgodovina je v nastavitvah), pod
 // njo drseča vsebina. Uporabnik brez gospodinjstva namesto vsebine vidi
 // Onboarding (ustvari gospodinjstvo / pridruži se s kodo).
 export default async function AppLayout({
@@ -46,8 +44,8 @@ export default async function AppLayout({
         </Link>
         {membership && (
           <nav className="flex min-w-0 items-center gap-0.5 sm:gap-1">
-            {/* Glavni zavihki: na telefonu ikona z napisom pod njo, na računalniku na sredini vrstice. */}
-            <div className="flex items-center gap-0.5 sm:absolute sm:left-1/2 sm:-translate-x-1/2 sm:gap-1">
+            {/* Glavni zavihki na sredini vrstice: na telefonu ikona z napisom pod njo, na računalniku v vrsti. */}
+            <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5 sm:gap-1">
               {TABS.map(({ href, label, Icon }) => (
                 <Link key={href} href={href} className={TAB}>
                   <Icon className="h-5 w-5" />
@@ -55,17 +53,6 @@ export default async function AppLayout({
                 </Link>
               ))}
             </div>
-            <Link href="/zgodovina" aria-label="Zgodovina" className={ICON_BTN}>
-              <IconHistory className="h-5 w-5" />
-              <span className="hidden sm:inline">Zgodovina</span>
-            </Link>
-            {/* ZA TESTIRANJE: predogled mamine domače strani (sin vidi, kar vidi mama). */}
-            {canPreviewMama(membership.member) && (
-              // Suspense: useSearchParams v client komponenti
-              <Suspense fallback={null}>
-                <MamaPreviewToggle className={ICON_BTN} />
-              </Suspense>
-            )}
             <Link href="/nastavitve" aria-label="Nastavitve" className={ICON_BTN}>
               <IconSettings className="h-5 w-5" />
             </Link>

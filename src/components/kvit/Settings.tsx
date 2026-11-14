@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   leaveHouseholdAction,
   renameHouseholdAction,
@@ -11,7 +12,7 @@ import { logoutAction } from "@/actions/auth";
 import Button from "@/components/ui/Button";
 import PromptDialog from "@/components/ui/PromptDialog";
 import ThemeToggle from "@/components/theme/ThemeToggle";
-import { IconCheck, IconCopy, IconLogout, IconPencil } from "@/components/ui/icons";
+import { IconCheck, IconCopy, IconHistory, IconLogout, IconPencil } from "@/components/ui/icons";
 import { amountInput, formatEur, parseAmount } from "@/lib/kvit/text";
 import type { KvitMember, KvitMembership } from "@/lib/types/database.types";
 
@@ -57,6 +58,15 @@ export default function Settings({
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Nastavitve</h1>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+      <Link
+        href="/zgodovina"
+        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 font-semibold hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800"
+      >
+        <IconHistory className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+        <span className="flex-1">Zgodovina</span>
+        <span aria-hidden className="text-gray-400">›</span>
+      </Link>
 
       <section className={CARD}>
         <div className="flex items-center justify-between gap-2">

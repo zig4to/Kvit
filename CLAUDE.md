@@ -140,7 +140,8 @@ Ikone so Lucide-slog v `src/components/ui/icons.tsx` (brez emojijev).
 
 **Zgornja vrstica** (`src/app/(app)/layout.tsx`): logo Kvit → `/`; glavni
 zavihki **Domov** (hiška), **Lajf** (košarica), **Dolg**, **Avti** — na
-računalniku (≥ 640 px) na sredini vrstice; desno Zgodovina in Nastavitve.
+sredini vrstice (tudi na telefonu); desno Nastavitve (zobnik).
+Zgodovina je povezava na vrhu strani Nastavitve (`Settings.tsx`).
 Uporabnik brez gospodinjstva vidi `Onboarding`.
 
 ### `/` — domača stran (`src/app/(app)/page.tsx`)
@@ -173,13 +174,6 @@ Mama vidi `MamaDashboard`: **Aktualno** (prošnje „Nejc pravi, da ti je plača
 …“ (`debtRequests`, `0014`) → Potrdi / Zavrni), **Ta mesec** (stanje obeh
 sinov: Plačano / Čaka na tvojo potrditev / Še ni plačal · X €), **Skupni dolg**
 obeh sinov s skupno vsoto.
-
-**Začasno, za testiranje:** gumb **Mati** (oko) v zgornji vrstici (samo Žiga,
-`canPreviewMama` v `src/lib/data/kvit.ts`; Nejcu se `?pogled=mama` prezre)
-→ `/?pogled=mama` pokaže `MamaDashboard`; v predogledu je gumb obarvan
-(„Predogled: mama“ ×, `MamaPreviewToggle`, klik → `/`).
-Potrditve še vedno preveri strežnik (RPC dovoli samo vlogi mama). Ko ni več
-potreben, odstrani `MamaPreviewToggle` iz `layout.tsx` in `pogled` v `page.tsx`.
 
 ### Poravnava skupnih stroškov avtov (`CarBalance`, `0008`)
 
