@@ -175,20 +175,46 @@ async function LajfTab({ params }: { params: { oseba?: string; mesec?: string } 
   // Stroški meseca iz zavihkov Telekom, Elektrika, Hrana, Ogrevanje, Komunala (informativni seštevek).
   // Ogrevanje: znesek polnitve olja ÷ 12 za vsak mesec, ko se kuri.
   // Hrana: iz Cekarja (tekoči mesec živo, pretekli zapisani).
+  // Graf: do 6 mesecev do izbranega, ne pred prvim mesecem obračuna.
+  const firstKey = ledger.rows[0]?.key ?? row.key;
+  const allChartKeys = Array.from({ length: 6 }, (_, i) => addMonths(row.key, i - 5));
+  const chartKeys = allChartKeys.filter((k) => k >= firstKey);
   const [{ data: costRows }, heating, food] = await Promise.all([
-    supabase.from("kvit_household_costs").select("category, amount").eq("month", `${row.key}-01`),
+    supabase
+      .from("kvit_household_costs")
+      .select("category, month, amount")
+      .gte("month", `${chartKeys[0]}-01`)
+      .lte("month", `${row.key}-01`),
     getHeatingPeriods(supabase),
-    getFood(supabase, row.key),
+    getFood(supabase, chartKeys[0]),
   ]);
-  const costs: { label: string; amount: number | null; inTotal: boolean }[] = COST_TABS.map(({ id, label }) => {
-    // Ogrevanje: 1/12 polnitve olja, ki se kuri ta mesec.
-    if (id === "ogrevanje") return { label, amount: heatingForMonth(heating, row.key), inTotal: true };
-    if (id === "hrana") return { label, amount: food[row.key] ?? null, inTotal: true };
-    const found = (costRows ?? []).find((r) => r.category === id);
-    return { label, amount: found ? Number(found.amount) : null, inTotal: true };
+  const costsFor = (key: string) => {
+    const list: { label: string; amount: number | null; inTotal: boolean }[] = COST_TABS.map(({ id, label }) => {
+      // Ogrevanje: 1/12 polnitve olja, ki se kuri ta mesec.
+      if (id === "ogrevanje") return { label, amount: heatingForMonth(heating, key), inTotal: true };
+      if (id === "hrana") return { label, amount: food[key] ?? null, inTotal: true };
+      const found = (costRows ?? []).find((r) => r.category === id && String(r.month).startsWith(key));
+      return { label, amount: found ? Number(found.amount) : null, inTotal: true };
+    });
+    // RTV prispevek: fiksen znesek vsak mesec, na koncu seznama.
+    list.push({ label: "RTV prispevek", amount: RTV_MONTHLY, inTotal: true });
+    return list;
+  };
+  const costs = costsFor(row.key);
+  // Graf: vsota in posamezne kategorije (brez RTV, ki je fiksen) po mesecih.
+  // Meseci pred prvim mesecem obračuna so prazna mesta (empty), da ima graf vedno 6 stolpcev.
+  const costHistory = allChartKeys.map((key) => {
+    if (key < firstKey) return { key, total: 0, parts: {}, empty: true };
+    const list = costsFor(key);
+    return {
+      empty: false,
+      key,
+      total: list.reduce((a, c) => a + (c.inTotal ? (c.amount ?? 0) : 0), 0),
+      parts: Object.fromEntries(
+        list.filter((c) => c.label !== "RTV prispevek").map((c) => [c.label, c.amount ?? 0])
+      ),
+    };
   });
-  // RTV prispevek: fiksen znesek vsak mesec, na koncu seznama.
-  costs.push({ label: "RTV prispevek", amount: RTV_MONTHLY, inTotal: true });
 
   // Jaz najprej, nato ostali.
   const people = [...(mine ? [mine] : []), ...ledgers.filter((l) => l !== mine)].map((l) => ({
@@ -217,6 +243,7 @@ async function LajfTab({ params }: { params: { oseba?: string; mesec?: string } 
       householdId={ledger.member.household_id}
       receiptUrls={receiptUrls}
       costs={costs}
+      costHistory={costHistory}
     />
   );
 }

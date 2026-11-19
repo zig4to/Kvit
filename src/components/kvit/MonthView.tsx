@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import PromptDialog from "@/components/ui/PromptDialog";
 import EntryDialog, { KINDS } from "@/components/kvit/EntryDialog";
+import CostChart from "@/components/kvit/CostChart";
 import { IconCheck, IconChevronLeft, IconChevronRight, IconPencil, IconPlus } from "@/components/ui/icons";
 import {
   addMonthAction,
@@ -48,6 +49,7 @@ export default function MonthView({
   householdId,
   receiptUrls,
   costs,
+  costHistory,
 }: {
   people: PersonTab[];
   personId: string;
@@ -64,6 +66,7 @@ export default function MonthView({
   receiptUrls: Record<string, string>; // id vnosa → začasna povezava do slike računa
   // Stroški meseca iz ostalih zavihkov (informativno); inTotal = šteje v vsoto, ki se deli na tri.
   costs: { label: string; amount: number | null; inTotal: boolean }[];
+  costHistory: { key: string; total: number; parts: Record<string, number>; empty: boolean }[]; // graf informativnih stroškov po mesecih
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<{ entry: KvitEntry | null } | null>(null);
@@ -206,6 +209,7 @@ export default function MonthView({
             </>
           );
         })()}
+        <CostChart data={costHistory} selectedKey={row.key} />
         </div>
       </details>
 
