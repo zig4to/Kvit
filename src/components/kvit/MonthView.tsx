@@ -172,44 +172,54 @@ export default function MonthView({
       </div>
 
       {/* Informativni stroški meseca — privzeto zloženo, v glavi znesek na osebo. */}
-      <details className="group rounded-xl border border-amber-300 bg-amber-50 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 [&::-webkit-details-marker]:hidden">
-          <span className="text-xs font-semibold uppercase tracking-wide">
-            Stroški {monthLabel(row.key, false).toLowerCase()} · samo informativno
+      <details className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white text-sm text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+        {/* Tanek pas v barvah Kvita na vrhu kartice. */}
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-violet-500/70" />
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Stroški gospodinjstva · {monthLabel(row.key, false).toLowerCase()}
+            </span>
+            <span className="block text-xs text-gray-500 dark:text-gray-400">Samo informativno</span>
           </span>
-          <span className="flex items-center gap-1.5 font-semibold tabular-nums">
-            {formatEur(costs.reduce((a, c) => a + (c.inTotal ? (c.amount ?? 0) : 0), 0) / 3)}
-            <IconChevronRight className="size-4 transition-transform group-open:rotate-90" />
+          <span className="flex shrink-0 items-center gap-2">
+            <span className="text-right">
+              <span className="block text-base font-bold tabular-nums text-violet-600 dark:text-violet-300">
+                {formatEur(costs.reduce((a, c) => a + (c.inTotal ? (c.amount ?? 0) : 0), 0) / 3)}
+              </span>
+              <span className="block text-[11px] text-gray-500 dark:text-gray-400">na osebo</span>
+            </span>
+            <IconChevronRight className="size-4 text-gray-400 transition-transform group-open:rotate-90" />
           </span>
         </summary>
-        <div className="px-3 pb-3">
-        <ul className="space-y-0.5">
-          {costs.map((c) => (
-            <li key={c.label} className={clsx("flex justify-between gap-2", !c.inTotal && "opacity-60")}>
-              <span>
-                {c.label}
-                {!c.inTotal && <span className="text-xs"> · ni še všteto</span>}
-              </span>
-              <span className="tabular-nums">{c.amount === null ? "—" : formatEur(c.amount)}</span>
-            </li>
-          ))}
-        </ul>
-        {(() => {
-          const total = costs.reduce((a, c) => a + (c.inTotal ? (c.amount ?? 0) : 0), 0);
-          return (
-            <>
-              <div className="mt-1.5 flex justify-between border-t border-amber-300 pt-1.5 dark:border-amber-700/60">
-                <span>Skupaj</span>
-                <span className="tabular-nums">{formatEur(total)}</span>
+        <div className="border-t border-gray-100 px-4 pb-4 pt-3 dark:border-gray-800">
+          <ul className="space-y-1">
+            {costs.map((c) => (
+              <li key={c.label} className={clsx("flex justify-between gap-2", !c.inTotal && "opacity-60")}>
+                <span className="text-gray-600 dark:text-gray-400">
+                  {c.label}
+                  {!c.inTotal && <span className="text-xs"> · ni še všteto</span>}
+                </span>
+                <span className="tabular-nums">{c.amount === null ? "—" : formatEur(c.amount)}</span>
+              </li>
+            ))}
+          </ul>
+          {(() => {
+            const total = costs.reduce((a, c) => a + (c.inTotal ? (c.amount ?? 0) : 0), 0);
+            return (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-800/60">
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Skupaj</p>
+                  <p className="font-semibold tabular-nums">{formatEur(total)}</p>
+                </div>
+                <div className="rounded-xl bg-violet-500/10 px-3 py-2 ring-1 ring-inset ring-violet-500/20">
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Na osebo (÷ 3)</p>
+                  <p className="font-bold tabular-nums text-violet-700 dark:text-violet-300">{formatEur(total / 3)}</p>
+                </div>
               </div>
-              <div className="flex justify-between font-semibold">
-                <span>Na osebo (÷ 3)</span>
-                <span className="tabular-nums">{formatEur(total / 3)}</span>
-              </div>
-            </>
-          );
-        })()}
-        <CostChart data={costHistory} selectedKey={row.key} />
+            );
+          })()}
+          <CostChart data={costHistory} selectedKey={row.key} />
         </div>
       </details>
 
