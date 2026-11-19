@@ -68,8 +68,8 @@ export async function getFood(supabase: Supa, fromKey: string) {
 }
 
 // Stroški gospodinjstva po mesecih od `fromKey` do `untilKey` (vključno):
-// vrstice kategorij + RTV, vsota in delež na osebo (÷ 3). Delež nadomesti
-// fiksni mesečni znesek v obračunu (getLedgers).
+// vrstice kategorij + RTV, vsota in delež na osebo (÷ 3). Delež je mesečni
+// znesek v obračunu (getLedgers) in se spreminja iz meseca v mesec.
 export async function getHouseholdCosts(
   supabase: Supa,
   fromKey: string,

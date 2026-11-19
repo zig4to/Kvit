@@ -65,7 +65,7 @@ export async function getLedgers(supabase: Supa, untilKey: string): Promise<Memb
   ]);
 
   // Mesečni znesek = delež stroškov gospodinjstva (÷ 3) za vsak mesec obračuna
-  // (namesto fiksnega zneska člana).
+  // (spremenljiv iz meseca v mesec).
   const keys = (months ?? []).map((m) => m.month.slice(0, 7)).sort();
   const fromKey = keys[0] && keys[0] < untilKey ? keys[0] : untilKey;
   const toKey = keys.length && keys[keys.length - 1] > untilKey ? keys[keys.length - 1] : untilKey;

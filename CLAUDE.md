@@ -8,8 +8,9 @@ Družinska aplikacija za obračun stroškov skupnega življenja z mamo (nadomeš
 stara Excela „ŽIGA / NEJC“ in „Avto Stroški in Servisi“). Uporabniki: brata
 **Žiga** in **Nejc** (vloga `sin`) ter **Mama** (vloga `mama`).
 
-1. **Lajf** — mesečni obračun. Vsak brat mami dolguje fiksni znesek na mesec
-   (privzeto 350 €). Nakupi za hišo (Lidl, Hofer, deli za avto …) in plačila
+1. **Lajf** — mesečni obračun. Vsak brat mami dolguje vsak mesec tretjino
+   stroškov gospodinjstva (Telekom, Elektrika, Hrana iz Cekarja, Ogrevanje,
+   Komunala, RTV — znesek se spreminja iz meseca v mesec). Nakupi za hišo (Lidl, Hofer, deli za avto …) in plačila
    mami se odštejejo, posojila od mame prištejejo. Stanje ob koncu meseca
    (dolg ali dobropis) se **samo prenese** v naslednji mesec.
 2. **Dolg** — „Skupni dolg“ do mame (posojilo za avto), ločen od mesečnih
@@ -115,17 +116,16 @@ fiksnih 350 €): `getHouseholdCosts` (`src/lib/data/household-costs.ts`) za vsa
 mesec sešteje Telekom, Elektrika, Komunala (`kvit_household_costs`), Hrana
 (Cekar, `getFood`), Ogrevanje (polnitev ÷ 12) in RTV 14,02 € ter deli s 3;
 `getLedgers` ga poda v `computeLedger(…, fixedFor)`, kjer ima prednost pred
-`fixed_amount` / `monthly_amount` (ta stolpca in `setFixedAmountAction` /
-nastavitev privzetega zneska v Nastavitvah na obračun ne vplivajo več).
+`fixed_amount` / `monthly_amount` (stolpca ostaneta v bazi, a na obračun ne
+vplivata; nastavitev privzetega zneska in svinčnik pri mesecu sta odstranjena).
 Tekoči mesec se spreminja sproti (hrana iz Cekarja).
 
 `computeLedger` gre od prvega zapisanega meseca do tekočega (ljubljanski čas,
-`monthKey`). Manjkajoči meseci so **virtualni** (privzeti znesek člana), zato
-prenos nikoli ne preskoči meseca. Ob vsakem pisanju akcija `ensureMonth`
-(`src/actions/kvit.ts`) mesec zapiše in zapolni vrzel. Pred spremembo
-privzetega zneska `setMonthlyAmountAction` zapiše pretekle virtualne mesece s
-starim zneskom, da se zgodovina ne spremeni. Prazen mesec pred prvim zapisanim
-(puščica ‹) bi prenesel 350 € naprej — zato zahteva potrditev.
+`monthKey`). Manjkajoči meseci so **virtualni** (tudi zanje velja delež
+stroškov gospodinjstva), zato prenos nikoli ne preskoči meseca. Ob vsakem
+pisanju akcija `ensureMonth` (`src/actions/kvit.ts`) mesec zapiše in zapolni
+vrzel. Prazen mesec pred prvim zapisanim (puščica ‹) bi prenesel svoj delež
+stroškov naprej — zato zahteva potrditev.
 
 `src/lib/kvit/cars.ts` (prav tako brez importov): `splitNet(records, owners)`
 — neporavnan vnos s ceno: plačnik +cena, vsak lastnik −cena/n (en lastnik =
@@ -205,7 +205,7 @@ poravna takoj. Prikazano na domači strani in na vrhu `/avti`.
 
 `?oseba=<user_id>&mesec=YYYY-MM`, privzeto jaz in tekoči mesec (mama privzeto
 prvega sina, samo branje). Zamenjava osebe, ‹ › med meseci, kartica „Za
-doplačilo“ / „Dobropis“ / „Kvit“ z razčlenitvijo (fiksni znesek s svinčnikom),
+doplačilo“ / „Dobropis“ / „Kvit“ z razčlenitvijo („Stroški gospodinjstva (÷ 3)“, ni ročno nastavljivo),
 opomba meseca, vnosi. Plavajoči gumb „Dodaj“ → `EntryDialog` (znesek, vrsta,
 opis s predlogi, dokazilo, dan, **slika računa**). Klik na vnos ga uredi ali
 izbriše.
@@ -266,7 +266,7 @@ avto“. Trenutno: Passat zoom 1,35; Megane zoom 1,15, offset −10.
   `<details>`, odprt najnovejši; prikazani zadnji 3, „Naloži več“ doda 3 prek
   `?mesecev=`). Oznake vrst vnosov so tam
   podvojene, ker je `KINDS` v `"use client"` modulu.
-- `/nastavitve` `Settings` — privzeti mesečni znesek, gospodinjstvo, koda za
+- `/nastavitve` `Settings` — gospodinjstvo, koda za
   povabilo, člani, tema, odjava.
 - `Onboarding` — ustvari gospodinjstvo ali se pridruži s kodo; pri
   pridružitvi izbira „Kdo si?“ **Sin** / **Mama**.
@@ -277,7 +277,8 @@ avto“. Trenutno: Passat zoom 1,35; Megane zoom 1,15, offset −10.
   Tomše“, sin) in **Mama** („Mama“, vloga `mama`). Nejc in mama sta bila
   vpisana prek SQL 2026-11-06.
 - Meseci do vključno oktobra 2026 so poravnani izven aplikacije; **november
-  2026 je prvi mesec** in začne s 350 € (brez prenosa). Prazne vrstice za
+  2026 je prvi mesec** (brez prenosa); prvotno s fiksnimi 350 €, od 2026-11-19
+s tretjino stroškov gospodinjstva. Prazne vrstice za
   september/oktober so bile izbrisane.
 - Skupni dolg: Žiga 6.941 €, Nejc 8.172 € (oba „Skupni dolg“, brez odplačil).
 - Avti uvoženi iz Excela. Servisna vrstica Megane v Excelu je enaka kot pri

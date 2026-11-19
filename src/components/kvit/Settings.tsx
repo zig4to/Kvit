@@ -6,14 +6,12 @@ import {
   leaveHouseholdAction,
   renameHouseholdAction,
   setDisplayNameAction,
-  setMonthlyAmountAction,
 } from "@/actions/kvit";
 import { logoutAction } from "@/actions/auth";
 import Button from "@/components/ui/Button";
 import PromptDialog from "@/components/ui/PromptDialog";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { IconCheck, IconCopy, IconHistory, IconLogout, IconPencil } from "@/components/ui/icons";
-import { amountInput, formatEur, parseAmount } from "@/lib/kvit/text";
 import type { KvitMember, KvitMembership } from "@/lib/types/database.types";
 
 type Prompt = {
@@ -67,35 +65,6 @@ export default function Settings({
         <span className="flex-1">Zgodovina</span>
         <span aria-hidden className="text-gray-400">›</span>
       </Link>
-
-      <section className={CARD}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Privzeti mesečni znesek</p>
-            <p className="text-2xl font-semibold tabular-nums">{formatEur(member.monthly_amount)}</p>
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              setPrompt({
-                title: "Mesečni znesek",
-                label: "Znesek (€) — velja od tega meseca naprej",
-                initialValue: amountInput(member.monthly_amount),
-                onSubmit: async (v) => {
-                  const n = parseAmount(v);
-                  if (n === null || Number.isNaN(n)) return { error: "Vpiši znesek." };
-                  return setMonthlyAmountAction(n);
-                },
-              })
-            }
-          >
-            <IconPencil /> Spremeni
-          </Button>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Posamezen mesec lahko spremeniš tudi sam (svinčnik pri „Fiksni stroški“).
-        </p>
-      </section>
 
       <section className={CARD}>
         <div className="flex items-center justify-between gap-2">
@@ -156,7 +125,6 @@ export default function Settings({
                     <span className="text-gray-500 dark:text-gray-400"> (ti)</span>
                   )}
                 </span>
-                <span className="text-xs tabular-nums text-gray-500">{formatEur(m.monthly_amount)}/mesec</span>
                 {m.user_id === member.user_id && (
                   <button
                     type="button"

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { addMonths, monthKey } from "@/lib/kvit/balance";
+import { addMonths } from "@/lib/kvit/balance";
 import { parseAmount } from "@/lib/kvit/text";
 import { firstName, getCarBalance } from "@/lib/data/kvit";
 import type { CostCategory, EntryKind, EntryProof } from "@/lib/types/database.types";
@@ -145,28 +145,6 @@ export async function setDisplayNameAction(name: string): Promise<KvitResult> {
   return done();
 }
 
-// Privzeti mesečni znesek: velja za nove mesece in tudi za tekoči mesec, če
-// zanj fiksni znesek še ni bil ročno spremenjen (= enak staremu privzetemu).
-export async function setMonthlyAmountAction(amount: number): Promise<KvitResult> {
-  const c = await ctx();
-  if (c.error !== undefined) return { error: c.error };
-  if (!(amount >= 0)) return { error: "Vpiši znesek." };
-  // Pretekle (še nezapisane) mesece zapiši s starim zneskom, da se ne spremenijo.
-  await ensureMonth(c, monthKey());
-  const { error } = await c.supabase
-    .from("kvit_members")
-    .update({ monthly_amount: amount })
-    .eq("user_id", c.userId);
-  if (error) return fail(undefined, "Shranjevanje ni uspelo.");
-  await c.supabase
-    .from("kvit_months")
-    .update({ fixed_amount: amount })
-    .eq("user_id", c.userId)
-    .eq("month", `${monthKey()}-01`)
-    .eq("fixed_amount", c.monthlyAmount);
-  return done();
-}
-
 export async function leaveHouseholdAction(): Promise<KvitResult> {
   const c = await ctx();
   if (c.error !== undefined) return { error: c.error };
@@ -177,17 +155,8 @@ export async function leaveHouseholdAction(): Promise<KvitResult> {
 }
 
 // ===== Meseci =====
-
-export async function setFixedAmountAction(key: string, amount: number): Promise<KvitResult> {
-  const c = await ctx();
-  if (c.error !== undefined) return { error: c.error };
-  if (!isKey(key) || !(amount >= 0)) return { error: "Vpiši znesek." };
-  const id = await ensureMonth(c, key);
-  if (!id) return { error: "Meseca ni bilo mogoče ustvariti." };
-  const { error } = await c.supabase.from("kvit_months").update({ fixed_amount: amount }).eq("id", id);
-  if (error) return fail(undefined, "Shranjevanje ni uspelo.");
-  return done();
-}
+// Mesečni znesek ni več ročno nastavljiv: obračun uporablja delež stroškov
+// gospodinjstva (÷ 3), glej getHouseholdCosts.
 
 export async function setMonthNoteAction(key: string, note: string): Promise<KvitResult> {
   const c = await ctx();

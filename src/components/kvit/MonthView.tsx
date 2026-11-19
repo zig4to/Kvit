@@ -31,7 +31,7 @@ type Prompt = {
   onSubmit: (v: string) => Promise<{ error?: string }>;
 };
 
-// Mesec ene osebe kot v starem Excelu: fiksni znesek, prenos, vnosi in na
+// Mesec ene osebe kot v starem Excelu: delež stroškov gospodinjstva, prenos, vnosi in na
 // vrhu „Za doplačilo“. Svoj mesec urejaš, bratovega samo gledaš.
 export default function MonthView({
   people,
