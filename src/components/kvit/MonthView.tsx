@@ -47,6 +47,7 @@ export default function MonthView({
   hasMama,
   householdId,
   receiptUrls,
+  costs,
 }: {
   people: PersonTab[];
   personId: string;
@@ -61,6 +62,7 @@ export default function MonthView({
   hasMama: boolean; // poravnavo potrdi mama
   householdId: string;
   receiptUrls: Record<string, string>; // id vnosa → začasna povezava do slike računa
+  costs: { label: string; amount: number | null }[]; // stroški meseca iz ostalih zavihkov (informativno)
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<{ entry: KvitEntry | null } | null>(null);
@@ -162,6 +164,24 @@ export default function MonthView({
         ) : (
           <span className="w-9" />
         )}
+      </div>
+
+      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide">
+          Stroški {monthLabel(row.key, false).toLowerCase()} · samo informativno
+        </p>
+        <ul className="space-y-0.5">
+          {costs.map((c) => (
+            <li key={c.label} className="flex justify-between gap-2">
+              <span>{c.label}</span>
+              <span className="tabular-nums">{c.amount === null ? "—" : formatEur(c.amount)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-1.5 flex justify-between border-t border-amber-300 pt-1.5 font-semibold dark:border-amber-700/60">
+          <span>Skupaj</span>
+          <span className="tabular-nums">{formatEur(costs.reduce((a, c) => a + (c.amount ?? 0), 0))}</span>
+        </div>
       </div>
 
       {confirmAddPrev && (

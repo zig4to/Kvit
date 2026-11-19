@@ -163,6 +163,18 @@ export type KvitSharedExpense = {
   created_at: string;
 };
 
+// Mesečni strošek gospodinjstva po kategoriji (0016).
+export type CostCategory = "telekom" | "elektrika" | "ogrevanje" | "hrana";
+export type KvitHouseholdCost = {
+  id: string;
+  household_id: string;
+  category: CostCategory;
+  month: string; // 1. dan meseca
+  amount: number;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type KvitMembership = {
   member: KvitMember;
   household: KvitHousehold;
@@ -182,6 +194,7 @@ export type Database = {
       kvit_car_deadlines: Table<KvitCarDeadline, "car_id" | "name">;
       kvit_car_specs: Table<KvitCarSpec, "car_id" | "name">;
       kvit_car_settlements: Table<KvitCarSettlement, "from_name" | "to_name" | "amount">;
+      kvit_household_costs: Table<KvitHouseholdCost, "category" | "month" | "amount">;
       kvit_shared_expenses: Table<KvitSharedExpense, "label" | "amount" | "paid_by" | "owed_by" | "share">;
     };
     Views: Record<string, never>;

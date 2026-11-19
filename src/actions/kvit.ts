@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { addMonths, monthKey } from "@/lib/kvit/balance";
+import { parseAmount } from "@/lib/kvit/text";
 import { firstName, getCarBalance } from "@/lib/data/kvit";
-import type { EntryKind, EntryProof } from "@/lib/types/database.types";
+import type { CostCategory, EntryKind, EntryProof } from "@/lib/types/database.types";
 
 export type KvitResult = { error?: string };
 
@@ -756,5 +757,45 @@ export async function setCarPhotoAction(carId: string, path: string | null): Pro
   if (car.photo_path && car.photo_path !== path) {
     await c.supabase.storage.from("kvit-avti").remove([car.photo_path]);
   }
+  return done();
+}
+
+// Mesečni strošek kategorije (zavihki Telekom, Elektrika, Ogrevanje, Hrana na /lajf).
+// Prazen znesek izbriše vnos meseca.
+export async function saveHouseholdCostAction(input: {
+  category: CostCategory;
+  month: string; // YYYY-MM
+  amount: string;
+}): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  if (!["telekom", "elektrika", "ogrevanje", "hrana"].includes(input.category) || !isKey(input.month))
+    return { error: "Neveljaven vnos." };
+  const month = `${input.month}-01`;
+  const amount = parseAmount(input.amount);
+  if (amount === null) {
+    const { error } = await c.supabase
+      .from("kvit_household_costs")
+      .delete()
+      .eq("household_id", c.householdId)
+      .eq("category", input.category)
+      .eq("month", month);
+    if (error) return fail(undefined, "Brisanje ni uspelo.");
+    return done();
+  }
+  if (Number.isNaN(amount)) return { error: "Vpiši veljaven znesek." };
+  const { error } = await c.supabase
+    .from("kvit_household_costs")
+    .upsert(
+      { household_id: c.householdId, category: input.category, month, amount },
+      { onConflict: "household_id,category,month" }
+    );
+  if (error)
+    return fail(
+      error.code === "42P01" || error.code === "PGRST205"
+        ? "Tabela kvit_household_costs še ne obstaja — izvedi migracijo 0016."
+        : undefined,
+      "Shranjevanje ni uspelo."
+    );
   return done();
 }
