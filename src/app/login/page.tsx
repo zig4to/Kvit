@@ -5,6 +5,7 @@ import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { loginAction, type AuthState } from "@/actions/auth";
 import { createClient } from "@/lib/supabase/client";
+import { dropSsoTokens, takeSsoTokens } from "@/lib/sso";
 import { Field, Input } from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import ThemeToggle from "@/components/theme/ThemeToggle";
@@ -24,8 +25,8 @@ export default function LoginPage() {
     // "idle" pokaže prijavni obrazec, "pending" pokaže nalagalnik.
     const showForm = () => root.setAttribute("data-sso", "idle");
 
-    const raw = window.location.hash.replace(/^#/, "");
-    if (raw.indexOf("sb_at=") === -1 || raw.indexOf("sb_rt=") === -1) {
+    const sso = takeSsoTokens();
+    if (!sso) {
       showForm();
       return;
     }
@@ -34,36 +35,15 @@ export default function LoginPage() {
     // tu pa poskrbimo še za primere, ko se stran ne naloži na novo).
     root.setAttribute("data-sso", "pending");
 
-    const params = new URLSearchParams(raw);
-    const accessToken = params.get("sb_at");
-    const refreshToken = params.get("sb_rt");
-
-    // Iz naslovne vrstice odstranimo le SSO parametra, ostalo pustimo.
-    params.delete("sb_at");
-    params.delete("sb_rt");
-    const rest = params.toString();
-    window.history.replaceState(
-      null,
-      "",
-      window.location.pathname + window.location.search + (rest ? "#" + rest : ""),
-    );
-
-    if (!accessToken || !refreshToken) {
-      showForm();
-      return;
-    }
-
     // Varovalka: če se izmenjava nikoli ne zaključi (Supabase nedosegljiv),
     // po nekaj sekundah vseeno pokažemo obrazec.
     const timeout = window.setTimeout(showForm, 10000);
 
     let cancelled = false;
     createClient()
-      .auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      })
+      .auth.setSession(sso)
       .then(({ error }) => {
+        dropSsoTokens();
         if (cancelled) return;
         window.clearTimeout(timeout);
         if (error) {
@@ -74,6 +54,7 @@ export default function LoginPage() {
         router.refresh();
       })
       .catch(() => {
+        dropSsoTokens();
         if (cancelled) return;
         window.clearTimeout(timeout);
         showForm();

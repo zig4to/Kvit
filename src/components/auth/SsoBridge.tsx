@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { dropSsoTokens, takeSsoTokens } from "@/lib/sso";
 
 /**
  * Prijava v ozadju iz huba (Bitneverse).
@@ -21,37 +22,20 @@ export default function SsoBridge() {
   const router = useRouter();
 
   useEffect(() => {
-    const raw = window.location.hash.replace(/^#/, "");
-    if (raw.indexOf("sb_at=") === -1 || raw.indexOf("sb_rt=") === -1) return;
-
-    const params = new URLSearchParams(raw);
-    const accessToken = params.get("sb_at");
-    const refreshToken = params.get("sb_rt");
-
-    // Iz URL-ja odstranimo le SSO parametra, ostalo pustimo.
-    params.delete("sb_at");
-    params.delete("sb_rt");
-    const rest = params.toString();
-    window.history.replaceState(
-      null,
-      "",
-      window.location.pathname + window.location.search + (rest ? "#" + rest : ""),
-    );
-
-    if (!accessToken || !refreshToken) return;
+    const sso = takeSsoTokens();
+    if (!sso) return;
 
     let cancelled = false;
     createClient()
-      .auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      })
+      .auth.setSession(sso)
       .then(({ error }) => {
+        dropSsoTokens();
         if (cancelled || error) return;
         router.replace("/");
         router.refresh();
       })
       .catch(() => {
+        dropSsoTokens();
         /* neveljaven žeton — ostane prijavni obrazec */
       });
 
