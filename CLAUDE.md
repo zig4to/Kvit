@@ -78,6 +78,9 @@ v številke.
 | `0013_remove_redni_servis_deadline` | izbriše prazne roke „Redni servis“ (servisi so v razdelku Redni servisi) |
 | `0014_debt_payment_approval` | `kvit_debt_payments.status` `pending`/`confirmed`/`rejected` (obstoječa `confirmed`), `resolved_at`; sprožilec `kvit_debt_payments_status` (z mamo v gospodinjstvu: nov vnos ali sprememba zneska/datuma → `pending`, sin stanja ne more spremeniti; brez mame → `confirmed`); RPC `kvit_confirm_debt_payment` / `kvit_reject_debt_payment` (samo mama) |
 | `0015_shared_expense_extra_people` | `kvit_shared_expenses.extra_people` 0–50 — še oseb izven Kvita pri delitvi „Enako“ (samo za prikaz in urejanje; `share` je že izračunan) |
+| `0016_household_costs` | `kvit_household_costs` (`category` `telekom`/`elektrika`/`ogrevanje`/`hrana`, `month` = 1. dan, `amount ≥ 0`, unique `(household_id, category, month)`) — mesečni stroški gospodinjstva na `/lajf`; RLS `for all` prek gospodinjstva, realtime |
+| `0017_household_costs_komunala` | kategorija `komunala` (zavihek Komunala na `/lajf`) |
+| `0018_heating_periods` | `kvit_heating_periods` (`started_on` = natankano, `ended_on` = zmanjkalo, null = še traja, `amount`, `liters`, `note`) — zavihek Ogrevanje (`HeatingPeriods`) namesto mesečnih zneskov; seštevek meseca na zavihku Lajf razdeli zaključene polnitve po dnevih (`heatingForMonth` v `src/lib/kvit/heating.ts`, brez importov). Kategorija `ogrevanje` v `kvit_household_costs` se ne uporablja več |
 
 **RLS:** `kvit_my_household()` (security definer). Vsi člani berejo vse v
 gospodinjstvu. Meseci, vnosi in dolgovi: **piše samo lastnik**

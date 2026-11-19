@@ -760,7 +760,53 @@ export async function setCarPhotoAction(carId: string, path: string | null): Pro
   return done();
 }
 
-// Mesečni strošek kategorije (zavihki Telekom, Elektrika, Ogrevanje, Hrana na /lajf).
+// Ogrevanje: obdobje od natankanja (startedOn) do dneva, ko olja zmanjka
+// (endedOn, prazno = še traja).
+export async function saveHeatingPeriodAction(input: {
+  id?: string;
+  startedOn: string;
+  endedOn: string;
+  amount: string;
+  liters: string;
+  note: string;
+}): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  const isDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  if (!isDay(input.startedOn)) return { error: "Vpiši dan natankanja." };
+  const endedOn = input.endedOn.trim() || null;
+  if (endedOn && !isDay(endedOn)) return { error: "Neveljaven dan konca." };
+  if (endedOn && endedOn < input.startedOn)
+    return { error: "Olja ne more zmanjkati pred natankanjem." };
+  const amount = parseAmount(input.amount);
+  if (amount === null || Number.isNaN(amount) || amount <= 0)
+    return { error: "Vpiši znesek, npr. 1200." };
+  const liters = parseAmount(input.liters);
+  if (liters !== null && (Number.isNaN(liters) || liters <= 0))
+    return { error: "Vpiši veljavno količino litrov ali pusti prazno." };
+  const row = {
+    started_on: input.startedOn,
+    ended_on: endedOn,
+    amount,
+    liters,
+    note: input.note.trim() || null,
+  };
+  const { error } = input.id
+    ? await c.supabase.from("kvit_heating_periods").update(row).eq("id", input.id)
+    : await c.supabase.from("kvit_heating_periods").insert({ ...row, household_id: c.householdId });
+  if (error) return fail(undefined, "Shranjevanje ni uspelo.");
+  return done();
+}
+
+export async function deleteHeatingPeriodAction(id: string): Promise<KvitResult> {
+  const c = await ctx();
+  if (c.error !== undefined) return { error: c.error };
+  const { error } = await c.supabase.from("kvit_heating_periods").delete().eq("id", id);
+  if (error) return fail(undefined, "Brisanje ni uspelo.");
+  return done();
+}
+
+// Mesečni strošek kategorije (zavihki Telekom, Elektrika, Hrana, Komunala na /lajf).
 // Prazen znesek izbriše vnos meseca.
 export async function saveHouseholdCostAction(input: {
   category: CostCategory;
@@ -769,7 +815,7 @@ export async function saveHouseholdCostAction(input: {
 }): Promise<KvitResult> {
   const c = await ctx();
   if (c.error !== undefined) return { error: c.error };
-  if (!["telekom", "elektrika", "ogrevanje", "hrana"].includes(input.category) || !isKey(input.month))
+  if (!["telekom", "elektrika", "ogrevanje", "hrana", "komunala"].includes(input.category) || !isKey(input.month))
     return { error: "Neveljaven vnos." };
   const month = `${input.month}-01`;
   const amount = parseAmount(input.amount);

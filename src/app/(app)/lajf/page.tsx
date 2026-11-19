@@ -4,6 +4,8 @@ import { getLedgers, labelSuggestions } from "@/lib/data/kvit";
 import { addMonths, monthKey } from "@/lib/kvit/balance";
 import MonthView from "@/components/kvit/MonthView";
 import CostMonths from "@/components/kvit/CostMonths";
+import HeatingPeriods from "@/components/kvit/HeatingPeriods";
+import { heatingForMonth } from "@/lib/kvit/heating";
 import type { CostCategory } from "@/lib/types/database.types";
 import Link from "next/link";
 import clsx from "@/lib/utils/clsx";
@@ -15,6 +17,7 @@ const TABS = [
   { id: "elektrika", label: "Elektrika" },
   { id: "hrana", label: "Hrana" },
   { id: "ogrevanje", label: "Ogrevanje" },
+  { id: "komunala", label: "Komunala" },
 ] as const;
 const COST_TABS = TABS.filter((t) => t.id !== "lajf");
 type Tab = (typeof TABS)[number]["id"];
@@ -49,6 +52,8 @@ export default async function LajfPage({
       </nav>
       {tab === "lajf" ? (
         <LajfTab params={params} />
+      ) : tab === "ogrevanje" ? (
+        <HeatingTab />
       ) : (
         <CostTab category={tab} />
       )}
@@ -56,8 +61,26 @@ export default async function LajfPage({
   );
 }
 
+async function getHeatingPeriods(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data } = await supabase
+    .from("kvit_heating_periods")
+    .select("*")
+    .order("started_on", { ascending: false });
+  return (data ?? []).map((p) => ({
+    ...p,
+    amount: Number(p.amount),
+    liters: p.liters === null ? null : Number(p.liters),
+  }));
+}
+
+// Ogrevanje: polnitve olja od natankanja do dneva, ko ga zmanjka (najnovejša prva).
+async function HeatingTab() {
+  const supabase = await createClient();
+  return <HeatingPeriods periods={await getHeatingPeriods(supabase)} />;
+}
+
 // Zadnjih 12 mesecev (tekoči prvi) z vnosnim poljem za znesek kategorije.
-async function CostTab({ category }: { category: CostCategory }) {
+async function CostTab({ category }: { category: Exclude<CostCategory, "ogrevanje"> }) {
   const supabase = await createClient();
   const current = monthKey();
   const months = Array.from({ length: 12 }, (_, i) => addMonths(current, -i));
@@ -111,14 +134,17 @@ async function LajfTab({ params }: { params: { oseba?: string; mesec?: string } 
     });
   }
 
-  // Stroški meseca iz zavihkov Telekom, Elektrika, Hrana, Ogrevanje (informativni seštevek).
-  const { data: costRows } = await supabase
-    .from("kvit_household_costs")
-    .select("category, amount")
-    .eq("month", `${row.key}-01`);
+  // Stroški meseca iz zavihkov Telekom, Elektrika, Hrana, Ogrevanje, Komunala (informativni seštevek).
+  // Ogrevanje: del zaključenih polnitev olja, ki pade v ta mesec (sorazmerno po dnevih).
+  const [{ data: costRows }, heating] = await Promise.all([
+    supabase.from("kvit_household_costs").select("category, amount").eq("month", `${row.key}-01`),
+    getHeatingPeriods(supabase),
+  ]);
   const costs = COST_TABS.map(({ id, label }) => {
+    // Ogrevanje je prikazano, a ni šteto v vsoto (deljenje na tri).
+    if (id === "ogrevanje") return { label, amount: heatingForMonth(heating, row.key), inTotal: false };
     const found = (costRows ?? []).find((r) => r.category === id);
-    return { label, amount: found ? Number(found.amount) : null };
+    return { label, amount: found ? Number(found.amount) : null, inTotal: true };
   });
 
   // Jaz najprej, nato ostali.

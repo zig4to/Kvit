@@ -164,13 +164,26 @@ export type KvitSharedExpense = {
 };
 
 // Mesečni strošek gospodinjstva po kategoriji (0016).
-export type CostCategory = "telekom" | "elektrika" | "ogrevanje" | "hrana";
+export type CostCategory = "telekom" | "elektrika" | "ogrevanje" | "hrana" | "komunala";
 export type KvitHouseholdCost = {
   id: string;
   household_id: string;
   category: CostCategory;
   month: string; // 1. dan meseca
   amount: number;
+  created_by: string | null;
+  created_at: string;
+};
+
+// Ogrevanje (0018): obdobje od natankanja do dneva, ko olja zmanjka.
+export type KvitHeatingPeriod = {
+  id: string;
+  household_id: string;
+  started_on: string;
+  ended_on: string | null; // null = še traja
+  amount: number;
+  liters: number | null;
+  note: string | null;
   created_by: string | null;
   created_at: string;
 };
@@ -195,6 +208,7 @@ export type Database = {
       kvit_car_specs: Table<KvitCarSpec, "car_id" | "name">;
       kvit_car_settlements: Table<KvitCarSettlement, "from_name" | "to_name" | "amount">;
       kvit_household_costs: Table<KvitHouseholdCost, "category" | "month" | "amount">;
+      kvit_heating_periods: Table<KvitHeatingPeriod, "started_on" | "amount">;
       kvit_shared_expenses: Table<KvitSharedExpense, "label" | "amount" | "paid_by" | "owed_by" | "share">;
     };
     Views: Record<string, never>;

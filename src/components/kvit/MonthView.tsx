@@ -62,7 +62,8 @@ export default function MonthView({
   hasMama: boolean; // poravnavo potrdi mama
   householdId: string;
   receiptUrls: Record<string, string>; // id vnosa → začasna povezava do slike računa
-  costs: { label: string; amount: number | null }[]; // stroški meseca iz ostalih zavihkov (informativno)
+  // Stroški meseca iz ostalih zavihkov (informativno); inTotal = šteje v vsoto, ki se deli na tri.
+  costs: { label: string; amount: number | null; inTotal: boolean }[];
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<{ entry: KvitEntry | null } | null>(null);
@@ -113,8 +114,9 @@ export default function MonthView({
   const prevGen = monthGenitive(addMonths(row.key, -1));
 
   return (
-    <div className="space-y-4 pb-24">
-      {people.length > 1 && (
+    <div className="space-y-4 pb-6">
+      {/* Sin vidi samo svoj mesec; preklop med sinovoma ima samo mama. */}
+      {people.length > 1 && !people.some((p) => p.isMe) && (
         <div
           className="grid gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800"
           style={{ gridTemplateColumns: `repeat(${people.length}, minmax(0, 1fr))` }}
@@ -166,23 +168,46 @@ export default function MonthView({
         )}
       </div>
 
-      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide">
-          Stroški {monthLabel(row.key, false).toLowerCase()} · samo informativno
-        </p>
+      {/* Informativni stroški meseca — privzeto zloženo, v glavi znesek na osebo. */}
+      <details className="group rounded-xl border border-amber-300 bg-amber-50 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 [&::-webkit-details-marker]:hidden">
+          <span className="text-xs font-semibold uppercase tracking-wide">
+            Stroški {monthLabel(row.key, false).toLowerCase()} · samo informativno
+          </span>
+          <span className="flex items-center gap-1.5 font-semibold tabular-nums">
+            {formatEur(costs.reduce((a, c) => a + (c.inTotal ? (c.amount ?? 0) : 0), 0) / 3)}
+            <IconChevronRight className="size-4 transition-transform group-open:rotate-90" />
+          </span>
+        </summary>
+        <div className="px-3 pb-3">
         <ul className="space-y-0.5">
           {costs.map((c) => (
-            <li key={c.label} className="flex justify-between gap-2">
-              <span>{c.label}</span>
+            <li key={c.label} className={clsx("flex justify-between gap-2", !c.inTotal && "opacity-60")}>
+              <span>
+                {c.label}
+                {!c.inTotal && <span className="text-xs"> · ni še všteto</span>}
+              </span>
               <span className="tabular-nums">{c.amount === null ? "—" : formatEur(c.amount)}</span>
             </li>
           ))}
         </ul>
-        <div className="mt-1.5 flex justify-between border-t border-amber-300 pt-1.5 font-semibold dark:border-amber-700/60">
-          <span>Skupaj</span>
-          <span className="tabular-nums">{formatEur(costs.reduce((a, c) => a + (c.amount ?? 0), 0))}</span>
+        {(() => {
+          const total = costs.reduce((a, c) => a + (c.inTotal ? (c.amount ?? 0) : 0), 0);
+          return (
+            <>
+              <div className="mt-1.5 flex justify-between border-t border-amber-300 pt-1.5 dark:border-amber-700/60">
+                <span>Skupaj</span>
+                <span className="tabular-nums">{formatEur(total)}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span>Na osebo (÷ 3)</span>
+                <span className="tabular-nums">{formatEur(total / 3)}</span>
+              </div>
+            </>
+          );
+        })()}
         </div>
-      </div>
+      </details>
 
       {confirmAddPrev && (
         <div className="space-y-2 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-800">
@@ -299,7 +324,7 @@ export default function MonthView({
       <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         {entries.length === 0 ? (
           <p className="p-5 text-center text-sm text-gray-500 dark:text-gray-400">
-            {editable ? "Še ni vnosov. Dodaj nakup ali plačilo z gumbom spodaj." : "Še ni vnosov."}
+            {editable ? "Še ni vnosov. Dodaj nakup ali plačilo z gumbom Dodaj." : "Še ni vnosov."}
           </p>
         ) : (
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -378,6 +403,12 @@ export default function MonthView({
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
+      {editable && (
+        <Button className="w-full" onClick={() => setDialog({ entry: null })}>
+          <IconPlus /> Dodaj
+        </Button>
+      )}
+
       {!row.settled && settleRequest && (
         <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           <p>
@@ -439,16 +470,6 @@ export default function MonthView({
             <IconCheck /> Poravnaj mesec
           </Button>
         ))}
-
-      {editable && (
-        <button
-          type="button"
-          onClick={() => setDialog({ entry: null })}
-          className="fixed bottom-6 right-1/2 z-40 flex translate-x-1/2 items-center gap-2 rounded-full bg-gradient-to-br from-rose-500 to-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-500/30 hover:brightness-110"
-        >
-          <IconPlus className="h-5 w-5" /> Dodaj
-        </button>
-      )}
 
       <EntryDialog
         open={dialog !== null}
