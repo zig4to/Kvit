@@ -16,8 +16,8 @@ const TABS = [
   { id: "telekom", label: "Telekom" },
   { id: "elektrika", label: "Elektrika" },
   { id: "hrana", label: "Hrana" },
-  { id: "ogrevanje", label: "Ogrevanje" },
   { id: "komunala", label: "Komunala" },
+  { id: "ogrevanje", label: "Ogrevanje" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 

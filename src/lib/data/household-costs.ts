@@ -15,9 +15,11 @@ export const COST_CATEGORIES: { id: CostCategory; label: string }[] = [
 ];
 export const RTV_LABEL = "RTV prispevek";
 export const RTV_MONTHLY = 14.02; // fiksni RTV prispevek na mesec
+export const HEATING_EXCLUDED_UNTIL = "2027-09"; // ogrevanje ni v izračunu do vključno tega meseca
 export const SHARE_PEOPLE = 3; // stroški gospodinjstva se delijo na tri
 
-export type CostLine = { label: string; amount: number | null; inTotal: boolean };
+// note: majhno besedilo desno; prečrtana vrstica (inTotal = false) je izvzeta iz izračuna.
+export type CostLine = { label: string; amount: number | null; inTotal: boolean; note?: string };
 export type MonthCosts = { lines: CostLine[]; total: number; share: number };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -87,8 +89,17 @@ export async function getHouseholdCosts(
   const result = new Map<string, MonthCosts>();
   for (let key = fromKey; key <= untilKey; key = addMonths(key, 1)) {
     const lines: CostLine[] = COST_CATEGORIES.map(({ id, label }) => {
-      // Ogrevanje: 1/12 polnitve olja, ki se kuri ta mesec.
-      if (id === "ogrevanje") return { label, amount: heatingForMonth(heating, key), inTotal: true };
+      // Ogrevanje (1/12 polnitve olja, ki se kuri ta mesec) ni v izračunu do vključno
+      // HEATING_EXCLUDED_UNTIL: prečrtano, „prišteto k dolgu“. Od oktobra 2027 šteje v vsoto.
+      if (id === "ogrevanje") {
+        const excluded = key <= HEATING_EXCLUDED_UNTIL;
+        return {
+          label,
+          amount: heatingForMonth(heating, key),
+          inTotal: !excluded,
+          ...(excluded && { note: "Prišteto k dolgu" }),
+        };
+      }
       if (id === "hrana") return { label, amount: food[key] ?? null, inTotal: true };
       const found = (rows ?? []).find((r) => r.category === id && String(r.month).startsWith(key));
       return { label, amount: found ? Number(found.amount) : null, inTotal: true };

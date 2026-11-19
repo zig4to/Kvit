@@ -64,7 +64,7 @@ export default function MonthView({
   householdId: string;
   receiptUrls: Record<string, string>; // id vnosa → začasna povezava do slike računa
   // Stroški meseca iz ostalih zavihkov (informativno); inTotal = šteje v vsoto, ki se deli na tri.
-  costs: { label: string; amount: number | null; inTotal: boolean }[];
+  costs: { label: string; amount: number | null; inTotal: boolean; note?: string }[];
   costHistory: { key: string; total: number; parts: Record<string, number>; empty: boolean }[]; // graf informativnih stroškov po mesecih
 }) {
   const router = useRouter();
@@ -194,12 +194,16 @@ export default function MonthView({
         <div className="border-t border-gray-100 px-4 pb-4 pt-3 dark:border-gray-800">
           <ul className="space-y-1">
             {costs.map((c) => (
-              <li key={c.label} className={clsx("flex justify-between gap-2", !c.inTotal && "opacity-60")}>
-                <span className="text-gray-600 dark:text-gray-400">
+              <li key={c.label} className="flex justify-between gap-2">
+                <span className={clsx("text-gray-600 dark:text-gray-400", !c.inTotal && "line-through opacity-60")}>
                   {c.label}
-                  {!c.inTotal && <span className="text-xs"> · ni še všteto</span>}
                 </span>
-                <span className="tabular-nums">{c.amount === null ? "—" : formatEur(c.amount)}</span>
+                <span className="flex items-baseline gap-2">
+                  {c.note && <span className="text-xs text-gray-400 dark:text-gray-500">{c.note}</span>}
+                  <span className={clsx("tabular-nums", !c.inTotal && "line-through opacity-60")}>
+                    {c.amount === null ? "—" : formatEur(c.amount)}
+                  </span>
+                </span>
               </li>
             ))}
           </ul>
