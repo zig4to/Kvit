@@ -122,6 +122,27 @@ export async function joinHouseholdAction(
   return done();
 }
 
+// „Nadaljuj v …“ na Onboardingu: koda je shranjena v brskalniku ob zadnjem
+// uspešnem obisku. Če je uporabnik že član, RPC samo vrne gospodinjstvo (stran
+// se osveži); če seje ni več, vrne `relogin`, da odjemalec odpre prijavo.
+export async function rejoinHouseholdAction(
+  code: string,
+  displayName: string,
+  role: "sin" | "mama"
+): Promise<KvitResult & { relogin?: boolean }> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  if (!user) return { error: "Seja je potekla — prijavi se znova.", relogin: true };
+  if (!code.trim()) return { error: "Koda ni shranjena." };
+  const { error } = await supabase.rpc("kvit_join_household", {
+    p_code: code,
+    p_display_name: displayName || (user.email?.split("@")[0] ?? ""),
+    p_role: role === "mama" ? "mama" : "sin",
+  });
+  if (error) return fail(error.message, "Vrnitev v gospodinjstvo ni uspela.");
+  return done();
+}
+
 export async function renameHouseholdAction(name: string): Promise<KvitResult> {
   const c = await ctx();
   if (c.error !== undefined) return { error: c.error };

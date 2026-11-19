@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createHouseholdAction, joinHouseholdAction } from "@/actions/kvit";
+import { createHouseholdAction, joinHouseholdAction, rejoinHouseholdAction } from "@/actions/kvit";
+import { parseSavedHousehold, readSavedHouseholdRaw } from "@/components/kvit/RememberHousehold";
+
+const noSubscribe = () => () => {};
 import { logoutAction } from "@/actions/auth";
 import Button from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Input";
@@ -19,6 +22,33 @@ export default function Onboarding({ email }: { email: string | null }) {
   const [role, setRole] = useState<"sin" | "mama">("sin");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Gospodinjstvo z zadnjega uspešnega obiska (RememberHousehold). Bere se ob
+  // prvem upodabljanju na odjemalcu; na strežniku je null.
+  const savedRaw = useSyncExternalStore(
+    noSubscribe,
+    () => readSavedHouseholdRaw(),
+    () => null
+  );
+  const saved = useMemo(() => parseSavedHousehold(savedRaw), [savedRaw]);
+  const [rejoinError, setRejoinError] = useState<string | null>(null);
+  const [rejoining, startRejoin] = useTransition();
+
+  const rejoin = () => {
+    if (!saved) return;
+    setRejoinError(null);
+    startRejoin(async () => {
+      const res = await rejoinHouseholdAction(saved.code, saved.displayName, saved.role);
+      if (res.relogin) {
+        router.push("/login");
+        return;
+      }
+      if (res.error) {
+        setRejoinError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
 
   const submit = () => {
     setError(null);
@@ -44,6 +74,20 @@ export default function Onboarding({ email }: { email: string | null }) {
           in mama se pridružita s kodo iz Nastavitev.
         </p>
       </div>
+
+      {saved && (
+        <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/30">
+          <Button type="button" onClick={rejoin} disabled={rejoining} className="w-full">
+            {rejoining ? "Trenutek …" : `Nadaljuj v ${saved.name}`}
+          </Button>
+          <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+            Brez vpisovanja kode — kot {saved.displayName || "prej"}.
+          </p>
+          {rejoinError && (
+            <p className="text-center text-sm text-red-600 dark:text-red-400">{rejoinError}</p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
         {(

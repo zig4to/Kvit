@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/supabase/auth";
 import { getMembership } from "@/lib/data/kvit";
 import SsoHashCleanup from "@/components/auth/SsoHashCleanup";
 import Onboarding from "@/components/kvit/Onboarding";
+import RememberHousehold from "@/components/kvit/RememberHousehold";
 import { IconBasket, IconCar, IconHandCoins, IconHome, IconHandshake, IconSettings } from "@/components/ui/icons";
 
 const TABS = [
@@ -34,6 +35,14 @@ export default async function AppLayout({
   return (
     <div className="flex h-screen w-full flex-col">
       <SsoHashCleanup />
+      {membership && (
+        <RememberHousehold
+          name={membership.household.name}
+          code={membership.household.invite_code}
+          displayName={membership.member.display_name}
+          role={membership.member.role === "mama" ? "mama" : "sin"}
+        />
+      )}
       <header className="relative flex min-h-12 items-center justify-between gap-1 border-b border-gray-200 bg-white px-2 dark:border-gray-800 dark:bg-gray-900 sm:gap-2 sm:px-3">
         <Link
           href="/"

@@ -269,11 +269,17 @@ avto“. Trenutno: Passat zoom 1,35; Megane zoom 1,15, offset −10.
 - `/nastavitve` `Settings` — gospodinjstvo, koda za
   povabilo, člani, tema, odjava.
 - `Onboarding` — ustvari gospodinjstvo ali se pridruži s kodo; pri
-  pridružitvi izbira „Kdo si?“ **Sin** / **Mama**.
+  pridružitvi izbira „Kdo si?“ **Sin** / **Mama**. Layout ob vsakem
+  uspešnem obisku (`RememberHousehold`) shrani v `localStorage`
+  (`kvit-gospodinjstvo`) ime gospodinjstva, kodo, ime in vlogo → Onboarding
+  pokaže gumb **„Nadaljuj v <gospodinjstvo>“** (`rejoinHouseholdAction`; RPC
+  join je za obstoječega člana brez učinka, brez seje → `/login`). Članstvo se
+  ne izgubi — Onboarding se pokaže pomotoma, ko `getClaims`/poizvedba za
+  trenutek odpove (middleware ob začasni napaki spusti zahtevo naprej).
 
 ## Stanje podatkov (2026-11-06)
 
-- Gospodinjstvo „Bitne“: **Žiga** („Žiga Tomše“, sin), **Nejc** („Nejc
+- Gospodinjstvo „Tomšetki“ (prej „Bitne“, preimenovano 2026-11-20): **Žiga** („Žiga Tomše“, sin), **Nejc** („Nejc
   Tomše“, sin) in **Mama** („Mama“, vloga `mama`). Nejc in mama sta bila
   vpisana prek SQL 2026-11-06.
 - Meseci do vključno oktobra 2026 so poravnani izven aplikacije; **november
