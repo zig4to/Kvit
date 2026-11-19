@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
+import Menu, { MenuItem } from "@/components/ui/Menu";
 import { Field, Input } from "@/components/ui/Input";
 import {
   IconCalendar,
@@ -50,7 +51,7 @@ type Dialog =
   | { type: "car"; car: CarDetail | null }
   | { type: "record"; kind: CarRecordKind; record: KvitCarRecord | null }
   | { type: "deadline"; deadline: KvitCarDeadline | null }
-  | { type: "spec"; spec: KvitCarSpec | null };
+  | { type: "spec"; spec: KvitCarSpec | null; preset?: string };
 
 const CARD = "rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900";
 const ROW_BTN =
@@ -196,22 +197,18 @@ function CarPhoto({ url, alt, zoom, offset, className }: { url: string; alt: str
   );
 }
 
-// Kamera v glavi avta: izberi ali posnemi sliko → naloži → nadomesti logotip.
-function PhotoButton({ car }: { car: CarDetail }) {
+// Kamera in svinčnik v glavi avta. Na telefonu (< 640 px) sta pod menijem s tremi
+// pikami v kotu kartice; datotečni input je zunaj menija, da ostane v DOM-u,
+// ko se meni zapre in izbirnik datotek vrne sliko.
+function CarActions({ car, onEdit }: { car: CarDetail; onEdit: () => void }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const photoLabel = car.photo_url ? "Zamenjaj sliko" : "Dodaj sliko avta";
   return (
-    <label
-      title={error ?? (car.photo_url ? "Zamenjaj sliko" : "Dodaj sliko avta")}
-      className={clsx(
-        "cursor-pointer rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800",
-        error ? "text-red-500" : "text-gray-400 hover:text-gray-700",
-        pending && "animate-pulse"
-      )}
-    >
-      <IconCamera />
-      <span className="sr-only">{car.photo_url ? "Zamenjaj sliko" : "Dodaj sliko avta"}</span>
+    <>
       <input
+        ref={inputRef}
         type="file"
         accept="image/*"
         className="hidden"
@@ -232,7 +229,55 @@ function PhotoButton({ car }: { car: CarDetail }) {
           });
         }}
       />
-    </label>
+      {error && <p className="absolute bottom-1 right-2 text-xs text-red-500">{error}</p>}
+      <div className="absolute right-1.5 top-1.5 sm:hidden">
+        <Menu label="Možnosti avta">
+          {(close) => (
+            <>
+              <MenuItem
+                onClick={() => {
+                  inputRef.current?.click();
+                  close();
+                }}
+              >
+                <IconCamera className="h-4 w-4" /> {photoLabel}
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  close();
+                  onEdit();
+                }}
+              >
+                <IconPencil className="h-4 w-4" /> Uredi avto
+              </MenuItem>
+            </>
+          )}
+        </Menu>
+      </div>
+      <div className="hidden items-center sm:flex">
+        <button
+          type="button"
+          title={error ?? photoLabel}
+          aria-label={photoLabel}
+          onClick={() => inputRef.current?.click()}
+          className={clsx(
+            "rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800",
+            error ? "text-red-500" : "text-gray-400 hover:text-gray-700",
+            pending && "animate-pulse"
+          )}
+        >
+          <IconCamera />
+        </button>
+        <button
+          type="button"
+          aria-label="Uredi avto"
+          onClick={onEdit}
+          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
+        >
+          <IconPencil />
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -376,8 +421,8 @@ export default function CarsView({
         </div>
       ) : (
         <>
-          <section className={clsx(CARD, "overflow-hidden")}>
-            <div className="flex items-center gap-3 p-4">
+          <section className={clsx(CARD, "relative overflow-hidden")}>
+            <div className="flex items-center gap-3 p-4 pr-9 sm:pr-4">
             {car.photo_url ? (
               <CarPhoto key={car.id} url={car.photo_url} alt={car.name} zoom={car.photo_zoom} offset={car.photo_offset} className="h-20 w-32" />
             ) : (
@@ -390,23 +435,8 @@ export default function CarsView({
                 {lastKm > 0 && <span>{fmtKm(lastKm)}</span>}
                 {nextService !== null && <span>naslednji servis {fmtKm(nextService)}</span>}
               </p>
-              {car.owners.length > 0 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {car.owners.length > 1
-                    ? `Lastnika: ${joinNames(car.owners)} · stroški na pol`
-                    : `Lastnik: ${car.owners[0]} · plača sam`}
-                </p>
-              )}
             </div>
-            <PhotoButton car={car} />
-            <button
-              type="button"
-              aria-label="Uredi avto"
-              onClick={() => setDialog({ type: "car", car })}
-              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
-            >
-              <IconPencil />
-            </button>
+            <CarActions car={car} onEdit={() => setDialog({ type: "car", car })} />
             </div>
           </section>
 
@@ -526,6 +556,15 @@ export default function CarsView({
             onAdd={() => setDialog({ type: "spec", spec: null })}
             addLabel="Podatek"
           >
+            {!car.specs.some((s) => /^vin\b/i.test(s.name.trim())) && (
+              <button
+                type="button"
+                className={`${ROW_BTN} text-sm text-rose-600 dark:text-rose-400`}
+                onClick={() => setDialog({ type: "spec", spec: null, preset: "VIN številka" })}
+              >
+                + Vnesi VIN številko
+              </button>
+            )}
             {car.specs.length === 0 ? (
               <Empty text="Ni podatkov." />
             ) : (
@@ -616,7 +655,7 @@ export default function CarsView({
           <DeadlineForm key={dialog.deadline?.id ?? "new"} carId={car.id} deadline={dialog.deadline} onClose={close} />
         )}
         {dialog?.type === "spec" && car && (
-          <SpecForm key={dialog.spec?.id ?? "new"} carId={car.id} spec={dialog.spec} onClose={close} />
+          <SpecForm key={dialog.spec?.id ?? dialog.preset ?? "new"} carId={car.id} spec={dialog.spec} preset={dialog.preset} onClose={close} />
         )}
       </Modal>
     </div>
@@ -931,8 +970,18 @@ function DeadlineForm({ carId, deadline, onClose }: { carId: string; deadline: K
   );
 }
 
-function SpecForm({ carId, spec, onClose }: { carId: string; spec: KvitCarSpec | null; onClose: () => void }) {
-  const [name, setName] = useState(spec?.name ?? "");
+function SpecForm({
+  carId,
+  spec,
+  preset,
+  onClose,
+}: {
+  carId: string;
+  spec: KvitCarSpec | null;
+  preset?: string;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(spec?.name ?? preset ?? "");
   const [value, setValue] = useState(spec?.value ?? "");
   const [note, setNote] = useState(spec?.note ?? "");
   const { error, pending, run } = useSubmit(onClose);
@@ -948,7 +997,7 @@ function SpecForm({ carId, spec, onClose }: { carId: string; spec: KvitCarSpec |
         <Input id="spec-name" autoFocus={!spec} placeholder="npr. Velikost gum, olje" value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
       <Field label="Podatek" htmlFor="spec-value">
-        <Input id="spec-value" autoFocus={!!spec} placeholder="npr. 205/55/R16" value={value} onChange={(e) => setValue(e.target.value)} />
+        <Input id="spec-value" autoFocus={!!spec} placeholder={/^vin\b/i.test(name.trim()) ? "17 znakov, npr. WVWZZZ3CZ…" : "npr. 205/55/R16"} value={value} onChange={(e) => setValue(e.target.value)} />
       </Field>
       <Field label="Opombe" htmlFor="spec-note">
         <Input id="spec-note" value={note} onChange={(e) => setNote(e.target.value)} />
