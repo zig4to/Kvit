@@ -5,7 +5,7 @@ import { addMonths, monthKey } from "@/lib/kvit/balance";
 import MonthView from "@/components/kvit/MonthView";
 import CostMonths from "@/components/kvit/CostMonths";
 import HeatingPeriods from "@/components/kvit/HeatingPeriods";
-import { heatingForMonth } from "@/lib/kvit/heating";
+import { getFood, getHeatingPeriods, getHouseholdCosts, RTV_LABEL } from "@/lib/data/household-costs";
 import type { CostCategory } from "@/lib/types/database.types";
 import Link from "next/link";
 import clsx from "@/lib/utils/clsx";
@@ -19,8 +19,6 @@ const TABS = [
   { id: "ogrevanje", label: "Ogrevanje" },
   { id: "komunala", label: "Komunala" },
 ] as const;
-const COST_TABS = TABS.filter((t) => t.id !== "lajf");
-const RTV_MONTHLY = 14.02; // fiksni RTV prispevek na mesec (informativni izračun)
 type Tab = (typeof TABS)[number]["id"];
 
 // /lajf — zavihki (?zavihek=, privzeto lajf); zavihek „lajf“ kaže mesec osebe
@@ -62,55 +60,10 @@ export default async function LajfPage({
   );
 }
 
-async function getHeatingPeriods(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data } = await supabase
-    .from("kvit_heating_periods")
-    .select("*")
-    .order("started_on", { ascending: false });
-  return (data ?? []).map((p) => ({
-    ...p,
-    amount: Number(p.amount),
-    liters: p.liters === null ? null : Number(p.liters),
-  }));
-}
-
 // Ogrevanje: polnitve olja od natankanja do dneva, ko ga zmanjka (najnovejša prva).
 async function HeatingTab() {
   const supabase = await createClient();
   return <HeatingPeriods periods={await getHeatingPeriods(supabase)} />;
-}
-
-// Hrana iz Cekarja (0019): tekoči mesec je živa vsota iz Cekarja; pretekli
-// meseci so zapisani v kvit_household_costs. Pretekel mesec brez zapisa se ob
-// prvem ogledu po koncu meseca zapiše s končno vsoto iz Cekarja (kasneje ga
-// lahko ročno popraviš na zavihku Hrana). Vrne YYYY-MM → znesek od `fromKey`.
-async function getFood(supabase: Awaited<ReturnType<typeof createClient>>, fromKey: string) {
-  const current = monthKey();
-  const [{ data: stored }, { data: cekar }] = await Promise.all([
-    supabase
-      .from("kvit_household_costs")
-      .select("month, amount")
-      .eq("category", "hrana")
-      .gte("month", `${fromKey}-01`),
-    supabase.rpc("kvit_cekar_food", { p_from: `${fromKey}-01` }),
-  ]);
-  const values: Record<string, number> = {};
-  for (const r of stored ?? []) values[String(r.month).slice(0, 7)] = Number(r.amount);
-  const freeze: { category: "hrana"; month: string; amount: number }[] = [];
-  for (const r of cekar ?? []) {
-    const key = String(r.month).slice(0, 7);
-    const amount = Math.round(Number(r.amount) * 100) / 100;
-    if (key === current) values[key] = amount;
-    else if (key < current && values[key] === undefined && amount > 0) {
-      values[key] = amount;
-      freeze.push({ category: "hrana", month: `${key}-01`, amount });
-    }
-  }
-  if (freeze.length > 0)
-    await supabase
-      .from("kvit_household_costs")
-      .upsert(freeze, { onConflict: "household_id,category,month", ignoreDuplicates: true });
-  return values;
 }
 
 // Zadnjih 12 mesecev (tekoči prvi) z vnosnim poljem za znesek kategorije.
@@ -172,46 +125,25 @@ async function LajfTab({ params }: { params: { oseba?: string; mesec?: string } 
     });
   }
 
-  // Stroški meseca iz zavihkov Telekom, Elektrika, Hrana, Ogrevanje, Komunala (informativni seštevek).
-  // Ogrevanje: znesek polnitve olja ÷ 12 za vsak mesec, ko se kuri.
-  // Hrana: iz Cekarja (tekoči mesec živo, pretekli zapisani).
+  // Stroški gospodinjstva (Telekom, Elektrika, Hrana, Ogrevanje, Komunala, RTV);
+  // delež ÷ 3 je mesečni znesek v obračunu (getLedgers).
   // Graf: do 6 mesecev do izbranega, ne pred prvim mesecem obračuna.
   const firstKey = ledger.rows[0]?.key ?? row.key;
   const allChartKeys = Array.from({ length: 6 }, (_, i) => addMonths(row.key, i - 5));
-  const chartKeys = allChartKeys.filter((k) => k >= firstKey);
-  const [{ data: costRows }, heating, food] = await Promise.all([
-    supabase
-      .from("kvit_household_costs")
-      .select("category, month, amount")
-      .gte("month", `${chartKeys[0]}-01`)
-      .lte("month", `${row.key}-01`),
-    getHeatingPeriods(supabase),
-    getFood(supabase, chartKeys[0]),
-  ]);
-  const costsFor = (key: string) => {
-    const list: { label: string; amount: number | null; inTotal: boolean }[] = COST_TABS.map(({ id, label }) => {
-      // Ogrevanje: 1/12 polnitve olja, ki se kuri ta mesec.
-      if (id === "ogrevanje") return { label, amount: heatingForMonth(heating, key), inTotal: true };
-      if (id === "hrana") return { label, amount: food[key] ?? null, inTotal: true };
-      const found = (costRows ?? []).find((r) => r.category === id && String(r.month).startsWith(key));
-      return { label, amount: found ? Number(found.amount) : null, inTotal: true };
-    });
-    // RTV prispevek: fiksen znesek vsak mesec, na koncu seznama.
-    list.push({ label: "RTV prispevek", amount: RTV_MONTHLY, inTotal: true });
-    return list;
-  };
-  const costs = costsFor(row.key);
+  const chartFrom = allChartKeys.find((k) => k >= firstKey) ?? row.key;
+  const household = await getHouseholdCosts(supabase, chartFrom, row.key);
+  const costs = household.get(row.key)?.lines ?? [];
   // Graf: vsota in posamezne kategorije (brez RTV, ki je fiksen) po mesecih.
   // Meseci pred prvim mesecem obračuna so prazna mesta (empty), da ima graf vedno 6 stolpcev.
   const costHistory = allChartKeys.map((key) => {
-    if (key < firstKey) return { key, total: 0, parts: {}, empty: true };
-    const list = costsFor(key);
+    const month = household.get(key);
+    if (key < firstKey || !month) return { key, total: 0, parts: {}, empty: true };
     return {
       empty: false,
       key,
-      total: list.reduce((a, c) => a + (c.inTotal ? (c.amount ?? 0) : 0), 0),
+      total: month.total,
       parts: Object.fromEntries(
-        list.filter((c) => c.label !== "RTV prispevek").map((c) => [c.label, c.amount ?? 0])
+        month.lines.filter((c) => c.label !== RTV_LABEL).map((c) => [c.label, c.amount ?? 0])
       ),
     };
   });

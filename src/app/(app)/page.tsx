@@ -130,7 +130,7 @@ export default async function HomePage() {
         </div>
         {row && (
           <p className="mt-2 text-xs tabular-nums text-gray-500 dark:text-gray-400">
-            Fiksni {formatEur(row.fixed)}
+            Stroški ÷ 3 {formatEur(row.fixed)}
             {row.carryIn !== 0 && ` · prenos ${row.carryIn > 0 ? "+" : "−"}${formatEur(Math.abs(row.carryIn))}`}
             {row.deducted > 0 && ` · odšteto ${formatEur(row.deducted)}`}
             {row.added > 0 && ` · posojila ${formatEur(row.added)}`}

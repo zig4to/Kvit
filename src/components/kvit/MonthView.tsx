@@ -9,16 +9,15 @@ import Modal from "@/components/ui/Modal";
 import PromptDialog from "@/components/ui/PromptDialog";
 import EntryDialog, { KINDS } from "@/components/kvit/EntryDialog";
 import CostChart from "@/components/kvit/CostChart";
-import { IconCheck, IconChevronLeft, IconChevronRight, IconPencil, IconPlus } from "@/components/ui/icons";
+import { IconCheck, IconChevronLeft, IconChevronRight, IconPlus } from "@/components/ui/icons";
 import {
   addMonthAction,
-  setFixedAmountAction,
   setMonthNoteAction,
   settleMonthAction,
   unsettleMonthAction,
 } from "@/actions/kvit";
 import { addMonths, monthGenitive, monthLabel, type LedgerRow } from "@/lib/kvit/balance";
-import { amountInput, formatEur, parseAmount } from "@/lib/kvit/text";
+import { formatEur } from "@/lib/kvit/text";
 import type { KvitEntry } from "@/lib/types/database.types";
 import clsx from "@/lib/utils/clsx";
 
@@ -171,7 +170,7 @@ export default function MonthView({
         )}
       </div>
 
-      {/* Informativni stroški meseca — privzeto zloženo, v glavi znesek na osebo. */}
+      {/* Stroški gospodinjstva meseca — privzeto zloženo, v glavi delež na osebo (= mesečni znesek v obračunu). */}
       <details className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white text-sm text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
         {/* Tanek pas v barvah Kvita na vrhu kartice. */}
         <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-violet-500/70" />
@@ -180,7 +179,7 @@ export default function MonthView({
             <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
               Stroški gospodinjstva · {monthLabel(row.key, false).toLowerCase()}
             </span>
-            <span className="block text-xs text-gray-500 dark:text-gray-400">Samo informativno</span>
+            <span className="block text-xs text-gray-500 dark:text-gray-400">Delež na osebo gre v Za doplačilo</span>
           </span>
           <span className="flex shrink-0 items-center gap-2">
             <span className="text-right">
@@ -259,31 +258,9 @@ export default function MonthView({
 
         <dl className="mt-4 space-y-1.5 border-t border-gray-100 pt-3 text-left text-sm dark:border-gray-800">
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-gray-500 dark:text-gray-400">Fiksni stroški</dt>
-            <dd className="flex items-center gap-1 tabular-nums">
-              {formatEur(row.fixed)}
-              {editable && (
-                <button
-                  type="button"
-                  aria-label="Spremeni fiksni znesek"
-                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
-                  onClick={() =>
-                    setPrompt({
-                      title: `Fiksni stroški · ${monthLabel(row.key)}`,
-                      label: "Znesek (€)",
-                      initialValue: amountInput(row.fixed),
-                      onSubmit: async (v) => {
-                        const n = parseAmount(v);
-                        if (n === null || Number.isNaN(n)) return { error: "Vpiši znesek." };
-                        return setFixedAmountAction(row.key, n);
-                      },
-                    })
-                  }
-                >
-                  <IconPencil className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </dd>
+            {/* Mesečni znesek = delež stroškov gospodinjstva (kartica zgoraj), ni ročno nastavljiv. */}
+            <dt className="text-gray-500 dark:text-gray-400">Stroški gospodinjstva (÷ 3)</dt>
+            <dd className="tabular-nums">{formatEur(row.fixed)}</dd>
           </div>
           {Math.abs(row.carryIn) > 0.004 && (
             <div className="flex justify-between gap-2">

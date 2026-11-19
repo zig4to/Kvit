@@ -1,7 +1,8 @@
 // Izračun obračuna — čiste funkcije brez odvisnosti (uvaža jih tudi
 // scripts/check-balance.mjs, zato tu ni importov iz aplikacije).
 //
-//   za doplačilo = prenos iz prejšnjega meseca + fiksni znesek
+//   za doplačilo = prenos iz prejšnjega meseca + mesečni znesek
+//                  (v aplikaciji delež stroškov gospodinjstva ÷ 3)
 //                  + posojila − nakupi − plačila
 //
 // Pozitivno = še dolžan mami, negativno = dobropis, ki se prenese naprej.
@@ -51,10 +52,13 @@ export const monthKey = (d = new Date()) => todayIso(d).slice(0, 7);
 // Obračun enega člana od prvega zapisanega meseca do `untilKey`. Manjkajoči
 // meseci vmes (in do `untilKey`) dobijo privzeti znesek, da prenos nikoli ne
 // preskoči meseca. Brez zapisanih mesecev se obračun začne pri `untilKey`.
+// `fixedFor` (neobvezno): mesečni znesek po mesecu, ki ima prednost pred
+// zapisanim/privzetim — v aplikaciji delež stroškov gospodinjstva (÷ 3).
 export function computeLedger(
   months: LedgerInputMonth[],
   defaultFixed: number,
-  untilKey: string
+  untilKey: string,
+  fixedFor?: Record<string, number>
 ): LedgerRow[] {
   const byKey = new Map(months.map((m) => [m.key, m]));
   const sorted = [...byKey.keys()].sort();
@@ -65,7 +69,7 @@ export function computeLedger(
   let carry = 0;
   for (let key = first; key <= last; key = addMonths(key, 1)) {
     const m = byKey.get(key);
-    const fixed = m ? m.fixed : defaultFixed;
+    const fixed = fixedFor?.[key] ?? (m ? m.fixed : defaultFixed);
     let added = 0;
     let deducted = 0;
     for (const e of m?.entries ?? []) {

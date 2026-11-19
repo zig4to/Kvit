@@ -107,8 +107,17 @@ neposredno — potrjuje prek security definer RPC.
 `scripts/check-balance.mjs` prek Node type stripping):
 
 ```
-za doplačilo = prenos + fiksni + Σ posojila − Σ nakupi − Σ plačila
+za doplačilo = prenos + delež stroškov gospodinjstva (÷ 3) + Σ posojila − Σ nakupi − Σ plačila
 ```
+
+**Mesečni znesek = delež stroškov gospodinjstva** (od 2026-11-19, namesto
+fiksnih 350 €): `getHouseholdCosts` (`src/lib/data/household-costs.ts`) za vsak
+mesec sešteje Telekom, Elektrika, Komunala (`kvit_household_costs`), Hrana
+(Cekar, `getFood`), Ogrevanje (polnitev ÷ 12) in RTV 14,02 € ter deli s 3;
+`getLedgers` ga poda v `computeLedger(…, fixedFor)`, kjer ima prednost pred
+`fixed_amount` / `monthly_amount` (ta stolpca in `setFixedAmountAction` /
+nastavitev privzetega zneska v Nastavitvah na obračun ne vplivajo več).
+Tekoči mesec se spreminja sproti (hrana iz Cekarja).
 
 `computeLedger` gre od prvega zapisanega meseca do tekočega (ljubljanski čas,
 `monthKey`). Manjkajoči meseci so **virtualni** (privzeti znesek člana), zato

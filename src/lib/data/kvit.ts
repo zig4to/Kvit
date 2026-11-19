@@ -16,6 +16,7 @@ import type {
 } from "@/lib/types/database.types";
 import { computeLedger, type LedgerRow } from "@/lib/kvit/balance";
 import { pairDebts, recordDebts, type Debt } from "@/lib/kvit/cars";
+import { getHouseholdCosts } from "@/lib/data/household-costs";
 
 type Supa = SupabaseClient<Database>;
 
@@ -63,6 +64,14 @@ export async function getLedgers(supabase: Supa, untilKey: string): Promise<Memb
     supabase.from("kvit_entries").select("*").order("day", { nullsFirst: true }).order("created_at"),
   ]);
 
+  // Mesečni znesek = delež stroškov gospodinjstva (÷ 3) za vsak mesec obračuna
+  // (namesto fiksnega zneska člana).
+  const keys = (months ?? []).map((m) => m.month.slice(0, 7)).sort();
+  const fromKey = keys[0] && keys[0] < untilKey ? keys[0] : untilKey;
+  const toKey = keys.length && keys[keys.length - 1] > untilKey ? keys[keys.length - 1] : untilKey;
+  const costs = await getHouseholdCosts(supabase, fromKey, toKey);
+  const fixedFor = Object.fromEntries([...costs].map(([k, c]) => [k, c.share]));
+
   const entriesByMonth = new Map<string, KvitEntry[]>();
   for (const e of entries ?? []) {
     const list = entriesByMonth.get(e.month_id) ?? [];
@@ -84,7 +93,8 @@ export async function getLedgers(supabase: Supa, untilKey: string): Promise<Memb
         entries: entryMap.get(m.month.slice(0, 7)) ?? [],
       })),
       member.monthly_amount,
-      untilKey
+      untilKey,
+      fixedFor
     );
     return { member, rows, months: monthMap, entries: entryMap };
   });
