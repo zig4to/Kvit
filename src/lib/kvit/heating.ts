@@ -1,6 +1,6 @@
 // Ogrevanje (kurilno olje): čiste funkcije brez importov.
 // Datumi so "YYYY-MM-DD"; obdobje traja od dneva natankanja do dneva, ko olja
-// zmanjka (dan konca ni štet), najmanj 1 dan.
+// zmanjka (ended_on null = še traja).
 
 type Period = { started_on: string; ended_on: string | null; amount: number };
 
@@ -13,27 +13,20 @@ const utc = (iso: string) => {
 export const daysBetween = (from: string, to: string) =>
   Math.max(1, Math.round((utc(to) - utc(from)) / DAY));
 
-// Povprečni strošek na mesec (30,44 dni) zaključenega obdobja.
-export const perMonth = (p: Period & { ended_on: string }) =>
-  (p.amount / daysBetween(p.started_on, p.ended_on)) * 30.44;
+// Enkratni znesek polnitve se v obračunu deli na 12 mesecev.
+export const HEATING_MONTHS = 12;
+export const perMonth = (p: { amount: number }) =>
+  Math.round((p.amount / HEATING_MONTHS) * 100) / 100;
 
-// Del zneskov zaključenih obdobij, ki pade v mesec `key` (YYYY-MM), sorazmerno
-// po dnevih. Obdobja, ki še trajajo, niso šteta (konec ni znan). null = v
-// mesecu ni nobenega zaključenega obdobja.
+// Ogrevanje meseca `key` (YYYY-MM): 1/12 polnitve, ki se kuri v tem mesecu
+// (natankano do konca meseca in olja ni zmanjkalo pred začetkom meseca). Če
+// se v mesecu prekrivata dve polnitvi, šteje novejša. null = ni polnitve.
 export function heatingForMonth(periods: Period[], key: string): number | null {
   const [y, m] = key.split("-").map(Number);
   const start = Date.UTC(y, m - 1, 1);
   const end = Date.UTC(y, m, 1);
-  let total = 0;
-  let hit = false;
-  for (const p of periods) {
-    if (!p.ended_on) continue;
-    const a = utc(p.started_on);
-    const b = Math.max(utc(p.ended_on), a + DAY);
-    const overlap = Math.min(b, end) - Math.max(a, start);
-    if (overlap <= 0) continue;
-    hit = true;
-    total += (p.amount * overlap) / (b - a);
-  }
-  return hit ? Math.round(total * 100) / 100 : null;
+  const active = periods
+    .filter((p) => utc(p.started_on) < end && (!p.ended_on || utc(p.ended_on) >= start))
+    .sort((a, b) => b.started_on.localeCompare(a.started_on));
+  return active.length ? perMonth(active[0]) : null;
 }

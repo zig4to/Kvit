@@ -226,6 +226,8 @@ export type Database = {
       kvit_reject_month: { Args: { p_month_id: string }; Returns: undefined };
       kvit_confirm_debt_payment: { Args: { p_id: string }; Returns: undefined };
       kvit_reject_debt_payment: { Args: { p_id: string }; Returns: undefined };
+      // 0019: vsota zapravljenega v Cekarju po mesecih (month = 1. dan)
+      kvit_cekar_food: { Args: { p_from: string }; Returns: { month: string; amount: number }[] };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

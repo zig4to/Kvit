@@ -20,6 +20,7 @@ const TABS = [
   { id: "komunala", label: "Komunala" },
 ] as const;
 const COST_TABS = TABS.filter((t) => t.id !== "lajf");
+const RTV_MONTHLY = 14.02; // fiksni RTV prispevek na mesec (informativni izračun)
 type Tab = (typeof TABS)[number]["id"];
 
 // /lajf — zavihki (?zavihek=, privzeto lajf); zavihek „lajf“ kaže mesec osebe
@@ -79,11 +80,48 @@ async function HeatingTab() {
   return <HeatingPeriods periods={await getHeatingPeriods(supabase)} />;
 }
 
+// Hrana iz Cekarja (0019): tekoči mesec je živa vsota iz Cekarja; pretekli
+// meseci so zapisani v kvit_household_costs. Pretekel mesec brez zapisa se ob
+// prvem ogledu po koncu meseca zapiše s končno vsoto iz Cekarja (kasneje ga
+// lahko ročno popraviš na zavihku Hrana). Vrne YYYY-MM → znesek od `fromKey`.
+async function getFood(supabase: Awaited<ReturnType<typeof createClient>>, fromKey: string) {
+  const current = monthKey();
+  const [{ data: stored }, { data: cekar }] = await Promise.all([
+    supabase
+      .from("kvit_household_costs")
+      .select("month, amount")
+      .eq("category", "hrana")
+      .gte("month", `${fromKey}-01`),
+    supabase.rpc("kvit_cekar_food", { p_from: `${fromKey}-01` }),
+  ]);
+  const values: Record<string, number> = {};
+  for (const r of stored ?? []) values[String(r.month).slice(0, 7)] = Number(r.amount);
+  const freeze: { category: "hrana"; month: string; amount: number }[] = [];
+  for (const r of cekar ?? []) {
+    const key = String(r.month).slice(0, 7);
+    const amount = Math.round(Number(r.amount) * 100) / 100;
+    if (key === current) values[key] = amount;
+    else if (key < current && values[key] === undefined && amount > 0) {
+      values[key] = amount;
+      freeze.push({ category: "hrana", month: `${key}-01`, amount });
+    }
+  }
+  if (freeze.length > 0)
+    await supabase
+      .from("kvit_household_costs")
+      .upsert(freeze, { onConflict: "household_id,category,month", ignoreDuplicates: true });
+  return values;
+}
+
 // Zadnjih 12 mesecev (tekoči prvi) z vnosnim poljem za znesek kategorije.
 async function CostTab({ category }: { category: Exclude<CostCategory, "ogrevanje"> }) {
   const supabase = await createClient();
   const current = monthKey();
   const months = Array.from({ length: 12 }, (_, i) => addMonths(current, -i));
+  if (category === "hrana") {
+    const values = await getFood(supabase, months[months.length - 1]);
+    return <CostMonths category={category} months={months} values={values} liveKey={current} />;
+  }
   const { data } = await supabase
     .from("kvit_household_costs")
     .select("month, amount")
@@ -135,17 +173,22 @@ async function LajfTab({ params }: { params: { oseba?: string; mesec?: string } 
   }
 
   // Stroški meseca iz zavihkov Telekom, Elektrika, Hrana, Ogrevanje, Komunala (informativni seštevek).
-  // Ogrevanje: del zaključenih polnitev olja, ki pade v ta mesec (sorazmerno po dnevih).
-  const [{ data: costRows }, heating] = await Promise.all([
+  // Ogrevanje: znesek polnitve olja ÷ 12 za vsak mesec, ko se kuri.
+  // Hrana: iz Cekarja (tekoči mesec živo, pretekli zapisani).
+  const [{ data: costRows }, heating, food] = await Promise.all([
     supabase.from("kvit_household_costs").select("category, amount").eq("month", `${row.key}-01`),
     getHeatingPeriods(supabase),
+    getFood(supabase, row.key),
   ]);
-  const costs = COST_TABS.map(({ id, label }) => {
-    // Ogrevanje je prikazano, a ni šteto v vsoto (deljenje na tri).
-    if (id === "ogrevanje") return { label, amount: heatingForMonth(heating, row.key), inTotal: false };
+  const costs: { label: string; amount: number | null; inTotal: boolean }[] = COST_TABS.map(({ id, label }) => {
+    // Ogrevanje: 1/12 polnitve olja, ki se kuri ta mesec.
+    if (id === "ogrevanje") return { label, amount: heatingForMonth(heating, row.key), inTotal: true };
+    if (id === "hrana") return { label, amount: food[row.key] ?? null, inTotal: true };
     const found = (costRows ?? []).find((r) => r.category === id);
     return { label, amount: found ? Number(found.amount) : null, inTotal: true };
   });
+  // RTV prispevek: fiksen znesek vsak mesec, na koncu seznama.
+  costs.push({ label: "RTV prispevek", amount: RTV_MONTHLY, inTotal: true });
 
   // Jaz najprej, nato ostali.
   const people = [...(mine ? [mine] : []), ...ledgers.filter((l) => l !== mine)].map((l) => ({

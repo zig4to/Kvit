@@ -28,9 +28,6 @@ function duration(days: number) {
 export default function HeatingPeriods({ periods }: { periods: KvitHeatingPeriod[] }) {
   const [dialog, setDialog] = useState<{ period: KvitHeatingPeriod | null } | null>(null);
   const today = todayIso();
-  const closed = periods.filter((p) => p.ended_on);
-  const closedDays = closed.reduce((a, p) => a + daysBetween(p.started_on, p.ended_on!), 0);
-  const closedAmount = closed.reduce((a, p) => a + p.amount, 0);
 
   return (
     <div className="space-y-3">
@@ -62,11 +59,7 @@ export default function HeatingPeriods({ periods }: { periods: KvitHeatingPeriod
                       {p.liters ? ` · ${String(p.liters).replace(".", ",")} l` : ""}
                       {p.note ? ` · ${p.note}` : ""}
                     </span>
-                    {p.ended_on && (
-                      <span className="tabular-nums">
-                        ≈ {formatEur(perMonth({ ...p, ended_on: p.ended_on }))} / mesec
-                      </span>
-                    )}
+                    <span className="tabular-nums">{formatEur(perMonth(p))} / mesec (÷ 12)</span>
                   </div>
                 </button>
               </li>
@@ -75,13 +68,10 @@ export default function HeatingPeriods({ periods }: { periods: KvitHeatingPeriod
         </ul>
       )}
 
-      {closed.length > 0 && (
-        <div className="flex justify-between rounded-xl bg-gray-100 px-4 py-2.5 text-sm dark:bg-gray-800">
-          <span>Povprečno (zaključene polnitve)</span>
-          <span className="font-semibold tabular-nums">
-            ≈ {formatEur((closedAmount / closedDays) * 30.44)} / mesec
-          </span>
-        </div>
+      {periods.length > 0 && (
+        <p className="px-1 text-xs text-gray-500 dark:text-gray-400">
+          V obračunu se znesek polnitve deli na 12 mesecev; šteje vsak mesec, ko se olje kuri.
+        </p>
       )}
 
       <Button type="button" onClick={() => setDialog({ period: null })} className="w-full">

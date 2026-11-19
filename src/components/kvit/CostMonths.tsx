@@ -18,18 +18,36 @@ export default function CostMonths({
   category,
   months,
   values,
+  liveKey,
 }: {
   category: CostCategory;
   months: string[]; // YYYY-MM, najnovejši prvi
   values: Record<string, number>; // YYYY-MM → znesek
+  liveKey?: string; // Hrana: ta mesec je živa vsota iz Cekarja (samo branje)
 }) {
   const total = months.reduce((a, k) => a + (values[k] ?? 0), 0);
   return (
     <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      {liveKey && (
+        <p className="border-b border-gray-100 px-4 py-2.5 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+          Tekoči mesec se sproti posodablja iz Cekarja. Ob koncu meseca se zapiše končni znesek,
+          ki ga lahko še popraviš.
+        </p>
+      )}
       <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-        {months.map((k) => (
-          <Row key={`${category}-${k}-${values[k] ?? ""}`} category={category} month={k} value={values[k]} />
-        ))}
+        {months.map((k) =>
+          k === liveKey ? (
+            <li key={k} className="flex items-center gap-3 px-4 py-3">
+              <span className="min-w-0 flex-1 text-sm">
+                {label(k)}
+                <span className="ml-1.5 text-xs text-gray-500 dark:text-gray-400">· iz Cekarja</span>
+              </span>
+              <span className="pr-1 text-sm font-semibold tabular-nums">{formatEur(values[k] ?? 0)}</span>
+            </li>
+          ) : (
+            <Row key={`${category}-${k}-${values[k] ?? ""}`} category={category} month={k} value={values[k]} />
+          )
+        )}
       </ul>
       <div className="flex justify-between border-t border-gray-100 px-4 py-2.5 text-sm font-semibold dark:border-gray-800">
         <span>Skupaj ({months.length} mes.)</span>
